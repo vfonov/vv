@@ -163,7 +163,7 @@ void vvToolSegmentation::OpenBinaryImage()
   DD("OpenBinaryImage");
 
   // Load browser and select image
-  QString Extensions = "Images files ( *.mha *.mhd *.hdr *.his)";
+  QString Extensions = "Images files ( *.mha *.mhd *.hdr *.his *.mnc)";
   Extensions += ";;All Files (*)";
   QString filename =
     QFileDialog::getOpenFileName(this,tr("Open binary image"),

@@ -101,9 +101,9 @@ It is distributed under dual licence
 #define COLUMN_IMAGE_NAME 7
 
 #ifdef CLITK_PRIVATE_FEATURES
-#define EXTENSIONS "Images ( *.bmp *.png *.jpeg *.jpg *.tif *.mhd *.mha *.hdr *.vox *.his *.xdr *.SCAN *.nii *.nrrd *.nhdr *.refscan *.nii.gz *.usf)"
+#define EXTENSIONS "Images ( *.bmp *.png *.jpeg *.jpg *.tif *.mhd *.mha *.hdr *.vox *.his *.xdr *.SCAN *.nii *.nrrd *.nhdr *.refscan *.nii.gz *.usf *.mnc)"
 #else
-#define EXTENSIONS "Images ( *.bmp *.png *.jpeg *.jpg *.tif *.mhd *.mha *.hdr *.vox *.his *.xdr *.SCAN *.nii *.nrrd *.nhdr *.refscan *.nii.gz)"
+#define EXTENSIONS "Images ( *.bmp *.png *.jpeg *.jpg *.tif *.mhd *.mha *.hdr *.vox *.his *.xdr *.SCAN *.nii *.nrrd *.nhdr *.refscan *.nii.gz *.mnc)"
 #endif
 
 
@@ -2248,6 +2248,7 @@ void vvMainWindow::OpenField()
     Extensions += ";;nii Images ( *.nii)";
     Extensions += ";;nrrd Images ( *.nrrd)";
     Extensions += ";;nhdr Images ( *.nhdr)";
+    Extensions += ";;minc Images ( *.mnc)";
     Extensions += ";;All Files (*)";
     QString file = QFileDialog::getOpenFileName(this,tr("Load deformation field"),mInputPathName,Extensions);
     if (!file.isEmpty())
@@ -2706,6 +2707,7 @@ void vvMainWindow::SaveAs()
   if (dimension == 1) {
     OutputListeFormat.push_back(".mhd");
     OutputListeFormat.push_back(".mha");
+    OutputListeFormat.push_back(".mnc");
   }
   if (dimension == 2) {
     OutputListeFormat.push_back(".bmp");
@@ -2716,6 +2718,7 @@ void vvMainWindow::SaveAs()
     OutputListeFormat.push_back(".mha");
     OutputListeFormat.push_back(".hdr");
     OutputListeFormat.push_back(".vox");
+    OutputListeFormat.push_back(".mnc");
   } else if (dimension == 3) {
     OutputListeFormat.push_back(".mhd");
     OutputListeFormat.push_back(".mha");
@@ -2724,6 +2727,7 @@ void vvMainWindow::SaveAs()
     OutputListeFormat.push_back(".nhdr");
     OutputListeFormat.push_back(".hdr");
     OutputListeFormat.push_back(".vox");
+    OutputListeFormat.push_back(".mnc");
   } else if (dimension == 4) {
     OutputListeFormat.push_back(".mhd");
     OutputListeFormat.push_back(".mha");

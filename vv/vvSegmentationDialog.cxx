@@ -514,6 +514,7 @@ void vvSegmentationDialog::Save()
     if (dimension == 1) {
       OutputListeFormat.push_back(".mhd");
       OutputListeFormat.push_back(".mha");
+      OutputListeFormat.push_back(".mnc");
     }
     if (dimension == 2) {
       OutputListeFormat.push_back(".bmp");
@@ -524,11 +525,13 @@ void vvSegmentationDialog::Save()
       OutputListeFormat.push_back(".mhd");
       OutputListeFormat.push_back(".hdr");
       OutputListeFormat.push_back(".vox");
+      OutputListeFormat.push_back(".mnc");
     } else if (dimension == 3) {
       OutputListeFormat.push_back(".mha");
       OutputListeFormat.push_back(".mhd");
       OutputListeFormat.push_back(".hdr");
       OutputListeFormat.push_back(".vox");
+      OutputListeFormat.push_back(".mnc");
     } else if (dimension == 4) {
       OutputListeFormat.push_back(".mha");
       OutputListeFormat.push_back(".mhd");
