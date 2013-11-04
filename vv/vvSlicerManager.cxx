@@ -279,20 +279,18 @@ bool vvSlicerManager::SetOverlay(std::vector<std::string> filenames,int dim, std
 
 
 //----------------------------------------------------------------------------
-bool vvSlicerManager::SetFusion(std::string filename,int dim, std::string component)
+bool vvSlicerManager::SetFusion(std::vector<std::string> filenames,int dim, std::string component, vvImageReader::LoadedImageType type)
 {
-  mFusionName = filename;
+  mFusionName = filenames[0];
   mFusionComponent = component;
   if (dim > mImage->GetNumberOfDimensions()) {
-    mLastError = " Overlay dimension cannot be greater then reference image!";
+    mLastError = " Fusion dimension cannot be greater than reference image!";
     return false;
   }
   if (mFusionReader.IsNull())
     mFusionReader = vvImageReader::New();
-  std::vector<std::string> filenames;
-  filenames.push_back(filename);
   mFusionReader->SetInputFilenames(filenames);
-  mFusionReader->Update(mImage->GetNumberOfDimensions(),component.c_str(),mType);
+  mFusionReader->Update(type);
   if (mFusionReader->GetLastError().size() == 0) {
     for ( unsigned int i = 0; i < mSlicers.size(); i++) {
       mSlicers[i]->SetFusion(mFusionReader->GetOutput());
@@ -351,7 +349,7 @@ bool vvSlicerManager::SetFusionSequence(std::vector<std::string> filenames, int 
 	}
 
 	//adjust the time slider in the overlay panel
-	mFusionSequenceNbFrames = mFusionSequenceReader->GetOutput()->GetTransform().size()-1; //actually, this is the maximum index...
+	mFusionSequenceNbFrames = mFusionSequenceReader->GetOutput()->GetTransform().size(); 
 	mFusionSequenceFrameIndex = std::max<int>( 0, std::min<int>(mFusionSequenceFrameIndex, mFusionSequenceNbFrames));
 
 	return true;
@@ -965,6 +963,10 @@ void vvSlicerManager::ReloadFusion()
 //the secondary sequence is being reloaded.
 void vvSlicerManager::ReloadFusionSequence()
 {
+  //  this is to keep the slice thickness, which needs to be artificially increased for visualization
+  double sp_x, sp_y, sp_z;
+  this->GetImage()->GetVTKImages()[0]->GetSpacing(sp_x, sp_y, sp_z);
+
   mFusionSequenceReader->Update(mImage->GetNumberOfDimensions(),mFusionComponent.c_str(),vvImageReader::MERGEDWITHTIME);
 
   for ( unsigned int i = 0; i < mSlicers.size(); i++) {
@@ -982,6 +984,13 @@ void vvSlicerManager::ReloadFusionSequence()
   mFusionSequenceListInitialTransformMatrices.clear();
   for (unsigned i=0 ; i<mFusionSequenceNbFrames ; i++) {
 	  this->AddFusionSequenceInitialTransformMatrices( mFusionSequenceReader->GetOutput()->GetTransform()[i]->GetMatrix() );
+  }
+
+  //  also update the slice thickness
+  for (unsigned i=0 ; i<this->GetImage()->GetTransform().size() ; i++) {
+    sp_x = this->GetImage()->GetVTKImages()[i]->GetSpacing()[0];
+    sp_y = this->GetImage()->GetVTKImages()[i]->GetSpacing()[1];
+    this->GetImage()->GetVTKImages()[i]->SetSpacing( sp_x, sp_y, sp_z);
   }
 
 }
@@ -1244,41 +1253,46 @@ void vvSlicerManager::SetSlicingPreset(SlicingPresetType preset)
 //----------------------------------------------------------------------------
 void vvSlicerManager::SetPreset(int preset)
 {
+
   //vtkLookupTable* LUT = static_cast<vtkLookupTable*>(mSlicers[0]->GetWindowLevel()->GetLookupTable());
   double window = mSlicers[0]->GetColorWindow();
   double level = mSlicers[0]->GetColorLevel();
 
   std::string component_type=mImage->GetScalarTypeAsITKString();
   switch (preset) {
-  case 0:
+  case WL_AUTO:
     double range[2];
     mImage->GetScalarRange(range);
     window = range[1] - range[0];
     level = (range[1] + range[0])* 0.5;
     break;
-  case 1:
+  case WL_HOUNSFIELD:
     window = 2000;
     level = 0;
     break;
-  case 2:
+  case WL_SOFTTISSUE:
     window = 400;
     level = 20;
     break;
-  case 3: // lungs (same as FOCAL)
+  case WL_LUNGS: // lungs (same as FOCAL)
     window = 1700;
     level = -300;
     break;
-  case 4:
+  case WL_BONES:
     window = 1000;
     level = 500;
     break;
-  case 5:
+  case WL_HEAD:
+    window = 200;
+    level = 70;
+    break;
+  case WL_BINARY:
     window = 1;
     level = 0.5;
     break;
-  case 6:
+  case WL_USER:
     break;
-  case 7:
+  case WL_VENTILATION:
     window=1.;
     level=0.;
     break;
@@ -1328,7 +1342,7 @@ void vvSlicerManager::SetLocalColorWindowing(const int slicer, const bool bCtrlK
                                                           this->mSlicers[slicer]->GetConcatenatedTransform());
     this->SetColorWindow(max-min);
     this->SetColorLevel(0.5*(min+max));
-    this->SetPreset(6);
+    this->SetPreset(WL_USER);
   }
   this->Render();
   this->UpdateWindowLevel();

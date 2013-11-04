@@ -256,6 +256,11 @@
          </item>
          <item>
           <property name="text">
+           <string>Head/Brain</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
            <string>[0,1] Scale</string>
           </property>
          </item>
@@ -436,7 +441,7 @@
          </sizepolicy>
         </property>
         <property name="currentIndex">
-         <number>1</number>
+         <number>0</number>
         </property>
         <widget class="QWidget" name="DataTab">
          <attribute name="title">
@@ -805,7 +810,7 @@
      <x>0</x>
      <y>0</y>
      <width>1008</width>
-     <height>29</height>
+     <height>20</height>
     </rect>
    </property>
    <property name="defaultUp">
@@ -866,7 +871,6 @@
     <addaction name="actionOpen_Multiple_Images_As_One"/>
     <addaction name="separator"/>
     <addaction name="actionOpen_Dicom"/>
-    <addaction name="actionOpen_Dicom_Struct"/>
     <addaction name="actionOpen_VTK_contour"/>
     <addaction name="separator"/>
     <addaction name="actionSave_As"/>

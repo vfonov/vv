@@ -104,9 +104,9 @@ vvToolROIManager::~vvToolROIManager()
 // STATIC
 void vvToolROIManager::Initialize() {
   SetToolName("ROIManager");
-  SetToolMenuName("Display ROI (binary image)");
+  SetToolMenuName("Open ROI (binary image or RT-STRUCT)");
   SetToolIconFilename(":/common/icons/tool-roi.png");
-  SetToolTip("Display ROI from a binary image.");
+  SetToolTip("Display ROI from a binary image or a RT-struct file.");
   SetToolExperimental(false);
 }
 //------------------------------------------------------------------------------
@@ -317,7 +317,7 @@ void vvToolROIManager::Open()
 void vvToolROIManager::OpenBinaryImage(QStringList & filename) 
 {
   if (filename.size() == 0) return;
-  
+ 
   vvProgressDialog p("Reading ROI ...", true);
   p.SetCancelButtonEnabled(false);
   QApplication::setOverrideCursor(QCursor(Qt::WaitCursor));
@@ -341,7 +341,11 @@ void vvToolROIManager::OpenBinaryImage(QStringList & filename)
       return;
     }
     vvImage::Pointer binaryImage = reader->GetOutput();
-    AddImage(binaryImage, filename[i].toStdString(), mBackgroundValueSpinBox->value(),
+    std::ostringstream oss;
+    oss << vtksys::SystemTools::
+      GetFilenameName(vtksys::SystemTools::GetFilenameWithoutLastExtension(filename[i].toStdString()));
+    std::string name = oss.str();
+    AddImage(binaryImage, name, filename[i].toStdString(), mBackgroundValueSpinBox->value(),
              (!mBGModeCheckBox->isChecked()));
     mOpenedBinaryImageFilenames.push_back(filename[i]);
   }
@@ -359,6 +363,7 @@ void vvToolROIManager::OpenDicomImage(std::string filename)
   // GUI selector of roi
   vvMeshReader reader;
   reader.SetFilename(filename);
+  
   vvStructSelector selector;
   selector.SetStructures(reader.GetROINames());
   selector.SetPropagationCheckBoxFlag(false);
@@ -375,8 +380,8 @@ void vvToolROIManager::OpenDicomImage(std::string filename)
     // Loop on selected struct
     std::vector<int> list = selector.getSelectedItems();
     for (uint i=0; i<list.size(); i++) {
-      p.SetProgress(i, list.size());
-      
+      p.SetProgress(i, list.size());      
+       
       clitk::DicomRTStruct2ImageFilter filter;
       filter.SetCropMaskEnabled(true);
       filter.SetImage(mCurrentImage);
@@ -389,7 +394,7 @@ void vvToolROIManager::OpenDicomImage(std::string filename)
       binaryImage->AddVtkImage(filter.GetOutput());
     
       // Add to gui
-      AddImage(binaryImage, s->GetROIFromROINumber(list[i])->GetName(), 0, true);
+      AddImage(binaryImage, s->GetROIFromROINumber(list[i])->GetName(), "", 0, true); // "" = no filename
       mOpenedBinaryImageFilenames.push_back(filename.c_str());
     }
 
@@ -402,7 +407,9 @@ void vvToolROIManager::OpenDicomImage(std::string filename)
 
 
 //------------------------------------------------------------------------------
-void vvToolROIManager::AddImage(vvImage * binaryImage, std::string filename, 
+void vvToolROIManager::AddImage(vvImage * binaryImage, 
+                                std::string name, 
+                                std::string filename, 
                                 double BG, bool modeBG) 
 {
   // Check Dimension
@@ -420,9 +427,9 @@ void vvToolROIManager::AddImage(vvImage * binaryImage, std::string filename,
   int n = mROIList.size();
   
   // Compute the name of the new ROI
-  std::ostringstream oss;
-  oss << vtksys::SystemTools::GetFilenameName(vtksys::SystemTools::GetFilenameWithoutLastExtension(filename));
-  std::string name = oss.str();
+  // std::ostringstream oss;
+  // oss << vtksys::SystemTools::GetFilenameName(vtksys::SystemTools::GetFilenameWithoutLastExtension(filename));
+  // std::string name = oss.str();
   
   // Set color
   std::vector<double> color;
@@ -736,6 +743,9 @@ void vvToolROIManager::ChangeDepth(int n) {
 
 //------------------------------------------------------------------------------
 void vvToolROIManager::ReloadCurrentROI() {
+  if (mCurrentROI->GetFilename() == "") {
+    return; // do nothing (contour from rt struct do not reload)
+  }
 
   // Remove all contours/overlay first
   bool visible = mCurrentROIActor->IsVisible();

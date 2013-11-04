@@ -48,6 +48,7 @@ It is distributed under dual licence
 #include "vvSaveState.h"
 #include "vvReadState.h"
 #include "clitkConfiguration.h"
+#include "clitkMatrix.h"
 
 // ITK include
 #include <itkImage.h>
@@ -88,6 +89,7 @@ It is distributed under dual licence
 
 // Standard includes
 #include <iostream>
+#include <fstream>
 #include <sstream>
 #include <iomanip>
 
@@ -101,7 +103,7 @@ It is distributed under dual licence
 #define COLUMN_IMAGE_NAME 7
 
 #ifdef CLITK_PRIVATE_FEATURES
-#define EXTENSIONS "Images ( *.bmp *.png *.jpeg *.jpg *.tif *.mhd *.mha *.hdr *.vox *.his *.xdr *.SCAN *.nii *.nrrd *.nhdr *.refscan *.nii.gz *.usf *.mnc)"
+#define EXTENSIONS "Images ( *.bmp *.png *.jpeg *.jpg *.tif *.mhd *.mha *.hdr *.vox *.his *.xdr *.SCAN *.nii *.nrrd *.nhdr *.refscan *.nii.gz *.mnc *.usf *.svl)"
 #else
 #define EXTENSIONS "Images ( *.bmp *.png *.jpeg *.jpg *.tif *.mhd *.mha *.hdr *.vox *.his *.xdr *.SCAN *.nii *.nrrd *.nhdr *.refscan *.nii.gz *.mnc)"
 #endif
@@ -276,7 +278,7 @@ vvMainWindow::vvMainWindow():vvMainWindowBase()
   connect(actionWarp_image_with_vector_field,SIGNAL(triggered()),this,SLOT(WarpImage()));
   connect(actionLoad_images,SIGNAL(triggered()),this,SLOT(OpenImages()));
   connect(actionOpen_Dicom,SIGNAL(triggered()),this,SLOT(OpenDicom()));
-  connect(actionOpen_Dicom_Struct,SIGNAL(triggered()),this,SLOT(OpenDCStructContour()));
+  //  connect(actionOpen_Dicom_Struct,SIGNAL(triggered()),this,SLOT(OpenDCStructContour()));
   connect(actionOpen_VTK_contour,SIGNAL(triggered()),this,SLOT(OpenVTKContour()));
   connect(actionOpen_Multiple_Images_As_One,SIGNAL(triggered()),this,SLOT(MergeImages()));
   connect(actionSlice_Image_As_Multiple_Images,SIGNAL(triggered()),this,SLOT(SliceImages()));
@@ -294,7 +296,7 @@ vvMainWindow::vvMainWindow():vvMainWindowBase()
   connect(actionDocumentation,SIGNAL(triggered()),this,SLOT(ShowDocumentation()));
   connect(actionRegister_vv,SIGNAL(triggered()),this,SLOT(PopupRegisterForm()));
 
-  connect(overlayPanel, SIGNAL(FusionSequenceSignalButtonPressed()), this, SLOT(SelectFusionSequenceTemporalSignal()));
+  connect(overlayPanel, SIGNAL(FusionSequenceCorrespondancesButtonPressed()), this, SLOT(SelectFusionSequenceCorrespondances()));
 
 
   ///////////////////////////////////////////////
@@ -460,7 +462,7 @@ void vvMainWindow::AddContour(int image_index, vvMesh::Pointer contour, bool pro
   brush.setColor(QColor(contour->r*255,contour->g*255,contour->b*255));
   brush.setStyle(Qt::SolidPattern);
   item->setData(COLUMN_IMAGE_NAME,Qt::BackgroundRole,brush);
-  item->setData(COLUMN_IMAGE_NAME,Qt::DisplayRole,contour->structure_name.c_str());
+  //  item->setData(COLUMN_IMAGE_NAME,Qt::DisplayRole,contour->structure_name.c_str());
 
   for (int j = 1; j <= 4; j++)
     item->setData(j,Qt::CheckStateRole,DataTree->topLevelItem(image_index)->data(j,Qt::CheckStateRole));
@@ -738,7 +740,7 @@ void vvMainWindow::OpenDicom()
 {
   std::vector<std::string> files;
 
-  std::cout << "dicomSeriesSelector " << std::endl;
+  //std::cout << "dicomSeriesSelector " << std::endl;
   if (dicomSeriesSelector->exec() == QDialog::Accepted) {
     files = *(dicomSeriesSelector->GetFilenames());
     LoadImages(files, vvImageReader::DICOM);
@@ -958,7 +960,7 @@ void vvMainWindow::LoadImages(std::vector<std::string> files, vvImageReader::Loa
     double range[2];
     mSlicerManagers.back()->GetImage()->GetFirstVTKImageData()->GetScalarRange(range);
     if ((range[0] == 0) && (range[1] == 1)) {
-      presetComboBox->setCurrentIndex(5);// binary
+      presetComboBox->setCurrentIndex(WL_BINARY);// binary
     } else {
       // TODO
     }
@@ -1133,6 +1135,9 @@ void vvMainWindow::ImageInfoChanged()
     dim += pixelType + ")";
 
     infoPanel->setFileName(image);
+    std::string creationImageTimeValue("No creation time");
+    itk::ExposeMetaData< std::string > (*imageSelected->GetFirstMetaDataDictionary(), "creationImageTime", creationImageTimeValue);
+    infoPanel->setImageCreationTime(QString(creationImageTimeValue.c_str()));
     infoPanel->setDimension(dim);
     infoPanel->setSizePixel(GetVectorIntAsString(inputSize));
     infoPanel->setSizeMM(GetVectorDoubleAsString(sizeMM));
@@ -1141,7 +1146,7 @@ void vvMainWindow::ImageInfoChanged()
     infoPanel->setNPixel(QString::number(NPixel)+" ("+inputSizeInBytes+")");
 
     transformation = imageSelected->GetTransform()[tSlice]->GetMatrix();
-    infoPanel->setTransformation(Get4x4MatrixDoubleAsString(transformation));
+    infoPanel->setTransformation(clitk::Get4x4MatrixDoubleAsString(transformation).c_str());
 
     landmarksPanel->SetCurrentLandmarks(mSlicerManagers[index]->GetLandmarks(),
                                         mSlicerManagers[index]->GetTSlice());
@@ -1335,38 +1340,6 @@ QString vvMainWindow::GetSizeInBytes(unsigned long size)
     result += QString::number(size);
     result += "kb";//)";
   }
-  return result;
-}
-//------------------------------------------------------------------------------
-
-//------------------------------------------------------------------------------
-QString vvMainWindow::Get4x4MatrixDoubleAsString(vtkSmartPointer<vtkMatrix4x4> matrix, const int precision)
-{
-  std::ostringstream strmatrix;
-
-  // Figure out the number of digits of the integer part of the largest absolute value
-  // for each column
-  unsigned width[4];
-  for (unsigned int j = 0; j < 4; j++){
-    double absmax = 0.;
-    for (unsigned int i = 0; i < 4; i++)
-      absmax = std::max(absmax, vnl_math_abs(matrix->GetElement(i, j)));
-    unsigned ndigits = (unsigned)std::max(0.,std::log10(absmax))+1;
-    width[j] = precision+ndigits+3;
-  }
-
-  // Output with correct width, aligned to the right
-  for (unsigned int i = 0; i < 4; i++) {
-    for (unsigned int j = 0; j < 4; j++) {
-      strmatrix.setf(ios::fixed,ios::floatfield);
-      strmatrix.precision(precision);
-      strmatrix.fill(' ');
-      strmatrix.width(width[j]);
-      strmatrix << std::right << matrix->GetElement(i, j);
-    }
-    strmatrix << std::endl;
-  }
-  QString result = strmatrix.str().c_str();
   return result;
 }
 //------------------------------------------------------------------------------
@@ -1638,6 +1611,24 @@ void vvMainWindow::CloseImage(QTreeWidgetItem* item, int column)
       }
       //if the slicer manager was involved in a fusion sequence visualization...
       if ( mSlicerManagers[index]->IsInvolvedInFusionSequence() ) {
+        //in both cases, close the overlay: find it... and close it
+        //ideally, I should duplicate the code, and avoid calling CloseImage, since this pops up another interactive box
+        QTreeWidgetItem* overlayItem;
+        if (mSlicerManagers[index]->IsMainSequenceOfFusionSequence()) {
+          for (unsigned i=0 ; i<item->childCount() ; i++) {
+            overlayItem = item->child(i);
+            this->CloseImage( overlayItem, 0 );
+          }
+        }
+        else {
+          QTreeWidgetItem* linkedItem = this->GetItemFromSlicerManager( mSlicerManagers[mSlicerManagers[index]->GetFusionSequenceIndexOfLinkedManager()] );
+          for (unsigned i=0 ; i<linkedItem->childCount() ; i++) {
+            overlayItem = linkedItem->child(i);
+            this->CloseImage( overlayItem, 0 );
+          }
+        }
+
+        /* -- this is normally already done when closing the overlay.
         //reset the transforms
         overlayPanel->getFusionSequenceProperty(-1, false, 0, false);
 
@@ -1649,8 +1640,7 @@ void vvMainWindow::CloseImage(QTreeWidgetItem* item, int column)
             mSlicerManagers[index]->GetSlicer(i)->SetFusionSequenceCode(-1);
             mSlicerManagers[mSlicerManagers[index]->GetFusionSequenceIndexOfLinkedManager()]->GetSlicer(i)->SetFusionSequenceCode(-1);
         }
-        
-        //TODO: also remove the image overlaid with the main sequence, as it is becoming invalid...
+        */
       }
 
       linkPanel->removeImage(index);
@@ -1797,7 +1787,7 @@ void vvMainWindow::WindowLevelChanged()
 //------------------------------------------------------------------------------
 void vvMainWindow::WindowLevelEdited()
 {
-  presetComboBox->setCurrentIndex(6);
+  presetComboBox->setCurrentIndex(WL_USER);
   UpdateWindowLevel();
 }
 //------------------------------------------------------------------------------
@@ -1807,7 +1797,7 @@ void vvMainWindow::SetWindowLevel(double w, double l)
 {
   windowSpinBox->setValue(w);
   levelSpinBox->setValue(l);
-  presetComboBox->setCurrentIndex(6);
+  presetComboBox->setCurrentIndex(WL_USER);
   colorMapComboBox->setCurrentIndex(0);
   UpdateWindowLevel();
 }
@@ -1817,7 +1807,7 @@ void vvMainWindow::SetWindowLevel(double w, double l)
 void vvMainWindow::UpdateWindowLevel()
 {
   if (DataTree->selectedItems().size()) {
-    if (presetComboBox->currentIndex() == 7) //For ventilation
+    if (presetComboBox->currentIndex() == WL_VENTILATION) //For ventilation
       colorMapComboBox->setCurrentIndex(5);
     int index = GetSlicerIndexFromItem(DataTree->selectedItems()[0]);
     mSlicerManagers[index]->SetColorWindow(windowSpinBox->value());
@@ -1853,7 +1843,7 @@ void vvMainWindow::SwitchWindowLevel()
 {
   int index = GetSlicerIndexFromItem(DataTree->selectedItems()[0]);
   int window = mSlicerManagers[index]->GetColorWindow();
-  presetComboBox->setCurrentIndex(6);
+  presetComboBox->setCurrentIndex(WL_USER);
   windowSpinBox->setValue(-window);
   UpdateWindowLevel();
 }
@@ -1872,7 +1862,7 @@ void vvMainWindow::ApplyWindowLevelToAllImages()
       continue;
     mSlicerManagers[i]->SetColorWindow(window);
     mSlicerManagers[i]->SetColorLevel(level);
-    mSlicerManagers[i]->SetPreset(6);
+    mSlicerManagers[i]->SetPreset(WL_USER);
     mSlicerManagers[i]->Render();
   }
 }
@@ -1885,7 +1875,7 @@ void vvMainWindow::ApplyWindowToSetOfImages(double window, unsigned int indexMin
     if (mSlicerManagers[i] == NULL)
       continue;
     mSlicerManagers[i]->SetColorWindow(window);
-    mSlicerManagers[i]->SetPreset(6);
+    mSlicerManagers[i]->SetPreset(WL_USER);
     mSlicerManagers[i]->Render();
   }
 }
@@ -1898,7 +1888,7 @@ void vvMainWindow::ApplyLevelToSetOfImages(double level, unsigned int indexMin, 
     if (mSlicerManagers[i] == NULL)
       continue;
     mSlicerManagers[i]->SetColorLevel(level);
-    mSlicerManagers[i]->SetPreset(6);
+    mSlicerManagers[i]->SetPreset(WL_USER);
     mSlicerManagers[i]->Render();
   }
 }
@@ -2125,9 +2115,15 @@ void vvMainWindow::SelectFusionImage()
 
     QString Extensions = EXTENSIONS;
     Extensions += ";;All Files (*)";
-    QString file = QFileDialog::getOpenFileName(this,tr("Load Fusion image"),mInputPathName,Extensions);
-    if (!file.isEmpty())
-      AddFusionImage(index,file);
+    QStringList files = QFileDialog::getOpenFileNames(this,tr("Load Fusion image"),mInputPathName,Extensions);
+    if (files.isEmpty())
+      return;
+
+    std::vector<std::string> vecFileNames;
+    for (int i = 0; i < files.size(); i++) {
+      vecFileNames.push_back(files[i].toStdString());
+    }
+    AddFusionImage(index,vecFileNames,vvImageReader::IMAGE);
 }
 //------------------------------------------------------------------------------
 
@@ -2142,77 +2138,78 @@ void vvMainWindow::ResetTransformationToIdentity()
 //------------------------------------------------------------------------------
 
 //------------------------------------------------------------------------------
-void vvMainWindow::AddFusionImage(int index, QString file)
+void vvMainWindow::AddFusionImage(int index, std::vector<std::string> fileNames, vvImageReader::LoadedImageType type)
 {
+  QString file(fileNames[0].c_str());
   if (QFile::exists(file))
   {
     mInputPathName = itksys::SystemTools::GetFilenamePath(file.toStdString()).c_str();
     itk::ImageIOBase::Pointer reader = itk::ImageIOFactory::CreateImageIO(
       file.toStdString().c_str(), itk::ImageIOFactory::ReadMode);
-    reader->SetFileName(file.toStdString().c_str());
+    reader->SetFileName(fileNames[0].c_str());
     reader->ReadImageInformation();
     std::string component = reader->GetComponentTypeAsString(reader->GetComponentType());
-    if (reader) {
-      QApplication::setOverrideCursor(QCursor(Qt::WaitCursor));
-      vvProgressDialog progress("Opening fusion");
-      qApp->processEvents();
+    int dimension = reader->GetNumberOfDimensions();
+    QApplication::setOverrideCursor(QCursor(Qt::WaitCursor));
+    vvProgressDialog progress("Opening fusion");
+    qApp->processEvents();
 
-      std::string filename = itksys::SystemTools::GetFilenameWithoutExtension(file.toStdString()).c_str();
-      if (mSlicerManagers[index]->SetFusion(file.toStdString(),
-        reader->GetNumberOfDimensions(), component)) {
-          //create an item in the tree with good settings
-          QTreeWidgetItem *item = new QTreeWidgetItem();
-          item->setData(0,Qt::UserRole,file.toStdString().c_str());
-          item->setData(1,Qt::UserRole,tr("fusion"));
-          QFileInfo fileinfo(filename.c_str()); //Do not show the path
+    std::string filename = itksys::SystemTools::GetFilenameWithoutExtension(file.toStdString()).c_str();
+    if (mSlicerManagers[index]->SetFusion(fileNames,dimension, component,type)) {
+      //create an item in the tree with good settings
+      QTreeWidgetItem *item = new QTreeWidgetItem();
+      item->setData(0,Qt::UserRole,file.toStdString().c_str());
+      item->setData(1,Qt::UserRole,tr("fusion"));
+      QFileInfo fileinfo(file); //Do not show the path
           item->setData(COLUMN_IMAGE_NAME,Qt::DisplayRole,fileinfo.fileName());
           item->setToolTip(COLUMN_IMAGE_NAME, mSlicerManagers[index]->GetListOfAbsoluteFilePathInOneString("fusion").c_str());
           qApp->processEvents();
 
-          for (int j = 1; j <= 4; j++) {
-            item->setData(j,Qt::CheckStateRole,DataTree->topLevelItem(index)->data(j,Qt::CheckStateRole));
-          }
-
-          //Create the buttons for reload and close
-          qApp->processEvents();
-          QTreePushButton* cButton = new QTreePushButton;
-          cButton->setItem(item);
-          cButton->setColumn(COLUMN_CLOSE_IMAGE);
-          cButton->setToolTip(tr("close image"));
-          cButton->setIcon(QIcon(QString::fromUtf8(":/common/icons/exit.png")));
-          connect(cButton,SIGNAL(clickedInto(QTreeWidgetItem*, int)),
-            this,SLOT(CloseImage(QTreeWidgetItem*, int)));
-
-          QTreePushButton* rButton = new QTreePushButton;
-          rButton->setItem(item);
-          rButton->setColumn(COLUMN_RELOAD_IMAGE);
-          rButton->setToolTip(tr("reload image"));
-          rButton->setIcon(QIcon(QString::fromUtf8(":/common/icons/rotateright.png")));
-          connect(rButton,SIGNAL(clickedInto(QTreeWidgetItem*, int)),
-            this,SLOT(ReloadImage(QTreeWidgetItem*, int)));
-
-          DataTree->topLevelItem(index)->setExpanded(1);
-          DataTree->topLevelItem(index)->addChild(item);
-          DataTree->setItemWidget(item, COLUMN_CLOSE_IMAGE, cButton);
-          DataTree->setItemWidget(item, COLUMN_RELOAD_IMAGE, rButton);
-
-          //set the id of the image
-          QString id = DataTree->topLevelItem(index)->data(COLUMN_IMAGE_NAME,Qt::UserRole).toString();
-          item->setData(COLUMN_IMAGE_NAME,Qt::UserRole,id.toStdString().c_str());
-          UpdateTree();
-          qApp->processEvents();
-          ImageInfoChanged();
-          QApplication::restoreOverrideCursor();
-      } else {
-        QApplication::restoreOverrideCursor();
-        QString error = "Cannot import the new image.\n";
-        error += mSlicerManagers[index]->GetLastError().c_str();
-        QMessageBox::information(this,tr("Problem reading image !"),error);
+      for (int j = 1; j <= 4; j++) {
+        item->setData(j,Qt::CheckStateRole,DataTree->topLevelItem(index)->data(j,Qt::CheckStateRole));
       }
+
+      //Create the buttons for reload and close
+      qApp->processEvents();
+      QTreePushButton* cButton = new QTreePushButton;
+      cButton->setItem(item);
+      cButton->setColumn(COLUMN_CLOSE_IMAGE);
+      cButton->setToolTip(tr("close image"));
+      cButton->setIcon(QIcon(QString::fromUtf8(":/common/icons/exit.png")));
+      connect(cButton,SIGNAL(clickedInto(QTreeWidgetItem*, int)),
+        this,SLOT(CloseImage(QTreeWidgetItem*, int)));
+
+      QTreePushButton* rButton = new QTreePushButton;
+      rButton->setItem(item);
+      rButton->setColumn(COLUMN_RELOAD_IMAGE);
+      rButton->setToolTip(tr("reload image"));
+      rButton->setIcon(QIcon(QString::fromUtf8(":/common/icons/rotateright.png")));
+      connect(rButton,SIGNAL(clickedInto(QTreeWidgetItem*, int)),
+        this,SLOT(ReloadImage(QTreeWidgetItem*, int)));
+
+      DataTree->topLevelItem(index)->setExpanded(1);
+      DataTree->topLevelItem(index)->addChild(item);
+      DataTree->setItemWidget(item, COLUMN_CLOSE_IMAGE, cButton);
+      DataTree->setItemWidget(item, COLUMN_RELOAD_IMAGE, rButton);
+
+      //set the id of the image
+      QString id = DataTree->topLevelItem(index)->data(COLUMN_IMAGE_NAME,Qt::UserRole).toString();
+      item->setData(COLUMN_IMAGE_NAME,Qt::UserRole,id.toStdString().c_str());
+      UpdateTree();
+      qApp->processEvents();
+      ImageInfoChanged();
+      QApplication::restoreOverrideCursor();
+
+      // Update the display to update, e.g., the sliders
+      for(int i=0; i<4; i++)
+        DisplaySliders(index, i);
     } else {
+      QApplication::restoreOverrideCursor();
       QString error = "Cannot import the new image.\n";
+      error += mSlicerManagers[index]->GetLastError().c_str();
       QMessageBox::information(this,tr("Problem reading image !"),error);
     }
+    WindowLevelChanged();
   }
   else
     QMessageBox::information(this,tr("Problem reading Fusion !"),"File doesn't exist!");
@@ -2444,7 +2441,7 @@ void vvMainWindow::SelectFusionSequence()
 
 
 //------------------------------------------------------------------------------
-void vvMainWindow::SelectFusionSequenceTemporalSignal() {
+void vvMainWindow::SelectFusionSequenceCorrespondances() {
 
   //make sure the index is right?
   //in the end, I should attach the temporal data to the right sequence!
@@ -2455,34 +2452,50 @@ void vvMainWindow::SelectFusionSequenceTemporalSignal() {
   }
 
   //open a dialog box to find a file
-  QString Extensions = EXTENSIONS;
-  Extensions += ";;All Files (*)";
+  //QString Extensions = EXTENSIONS;
+  QString Extensions = ";;All Files (*)";
   QString fileName = QFileDialog::getOpenFileName(this,tr("Load respiratory signal for fused sequence"),mInputPathName,Extensions);
   if (fileName.isNull())
     return;
 
   //read it as a vector of values
-  std::vector<double> signal;
-  //...TODO, look for itk functions that can do that... vnl in the worst case.
-  signal.push_back(1);signal.push_back(2);
+  vnl_vector<double> tmpVect;
 
-  //TODO: instead: if the loaded signal is longer, just crop it...
-  //this allows loading only the first few frames when testing.
-  //->maybe raise a message that this behavior may be unsafe...
+  std::ifstream file;
+  file.open(fileName.toStdString().c_str());
+  tmpVect.read_ascii(file);
+  file.close();
 
-  //if compatible with the fused image sequence (number of images = number of entries), enable the temporalSync
-  if ( signal.size() >= mSlicerManagers[index]->GetFusionSequenceNbFrames()) {
-    //for convenience, associate this sequence to both the current slicer manager, and to the linked one
-    mSlicerManagers[index]->SetFusionSequenceTemporalSignal(signal);
-    mSlicerManagers[ mSlicerManagers[index]->GetFusionSequenceIndexOfLinkedManager() ]->SetFusionSequenceTemporalSignal(signal);
-    overlayPanel->enableFusionSequenceTemporalSync();
-    QMessageBox::information(this,tr("Adding signal"),"would add the signal from file: "+ fileName);
+  //if compatible with the fused image sequence (number of entries = nb of entries in main sequence + nb of entries in joint sequence), enable the temporalSync
+  bool signalOK = true;
+  unsigned nbFrameMain = mSlicerManagers[index]->GetImage()->GetTransform().size();
+  unsigned nbFrameSecondary = mSlicerManagers[index]->GetFusionSequenceNbFrames();
+std::cout<<"nbFrameMain = "<<nbFrameMain<<", nbFrameSecondary= "<<nbFrameSecondary<<", signal size: "<<tmpVect.size()<<std::endl;
+  std::vector<unsigned> temporalCorrespondances;
+  if ( tmpVect.size() == nbFrameMain + nbFrameSecondary ) {
+    for (unsigned i=0 ; i<tmpVect.size() ; i++) {
+      if (i<nbFrameMain) { //first part of the file: i -> index in secondary seq.
+        if ( tmpVect(i)<nbFrameSecondary ) temporalCorrespondances.push_back(tmpVect(i));
+        else { signalOK=false; break; } //pointing outside the secondary sequence...
+      }
+      else { //first part of the file -> index in secondary seq.
+        if ( tmpVect(i)<nbFrameMain ) temporalCorrespondances.push_back(tmpVect(i));
+        else { signalOK=false; break; } //pointing outside the secondary sequence...      
+      }      
+    }
   }
-  else {//else, send a message to signal the failure...
-    QString error = "The provided signal doesn't have the same duration as the sequence\n";
+  else {signalOK=false;}
+  if (!signalOK) {//else, send a message to signal the failure...
+    QString error = "The provided temporal correspondances is invalid - check tooltip.\n";
     error += "Ignoring file: " + fileName;
-    QMessageBox::information(this,tr("Problem adding signal!"),error);
+    QMessageBox::information(this,tr("Problem adding temporal correspondances!"),error);
     return;
+  }
+  else {
+    //for convenience, associate this sequence to both the current slicer manager, and to the linked one
+    mSlicerManagers[index]->SetFusionSequenceCorrespondances(temporalCorrespondances);
+    mSlicerManagers[ mSlicerManagers[index]->GetFusionSequenceIndexOfLinkedManager() ]->SetFusionSequenceCorrespondances(temporalCorrespondances);
+    overlayPanel->enableFusionSequenceTemporalSync();
   }
 
 }
@@ -2500,6 +2513,7 @@ void vvMainWindow::AddFusionSequence(int index, std::vector<std::string> fileNam
     mInputPathName = itksys::SystemTools::GetFilenamePath(file.toStdString()).c_str();
     itk::ImageIOBase::Pointer reader = itk::ImageIOFactory::CreateImageIO(
       file.toStdString().c_str(), itk::ImageIOFactory::ReadMode);
+    std::sort (fileNames.begin(), fileNames.end());//make sure the files are sorted.
     reader->SetFileName(fileNames[0].c_str());
     reader->ReadImageInformation();
     std::string component = reader->GetComponentTypeAsString(reader->GetComponentType());
@@ -2567,8 +2581,15 @@ void vvMainWindow::AddFusionSequence(int index, std::vector<std::string> fileNam
 
       //This loads the secondary sequence (US) as an independent sequence
       LoadImages(fileNames, type);
-      //reset the transforms to identiy
+      //reset the transforms to identity
+      //FIX -- and set the thickness of the US slices to a large value (necessary for visualization purposes...)
+      double sp_x, sp_y, sp_z;
+      mSlicerManagers[indexParent]->GetImage()->GetVTKImages()[0]->GetSpacing(sp_x, sp_y, sp_z);
+      sp_z = std::max(sp_x, std::max(sp_y, sp_z)) + 0.5; //
       for (unsigned i=0 ; i<mSlicerManagers.back()->GetImage()->GetTransform().size() ; i++) {
+        sp_x = mSlicerManagers.back()->GetImage()->GetVTKImages()[i]->GetSpacing()[0];
+        sp_y = mSlicerManagers.back()->GetImage()->GetVTKImages()[i]->GetSpacing()[1];
+        mSlicerManagers.back()->GetImage()->GetVTKImages()[i]->SetSpacing( sp_x, sp_y, sp_z);
         mSlicerManagers.back()->GetImage()->GetTransform()[i]->Identity();
         mSlicerManagers.back()->GetImage()->GetTransform()[i]->Update();
       }
@@ -2591,7 +2612,7 @@ void vvMainWindow::AddFusionSequence(int index, std::vector<std::string> fileNam
       error += mSlicerManagers[index]->GetLastError().c_str();
       QMessageBox::information(this,tr("Problem reading image !"),error);
     }
-    //WindowLevelChanged();
+    WindowLevelChanged();
     ImageInfoChanged(); //this internally calls WindowLevelChanged...
   }
   else {
@@ -2652,21 +2673,13 @@ void vvMainWindow::SetFusionSequenceProperty(int fusionSequenceFrameIndex, bool 
     if (spatialSyncFlag) { //reslice the CT
 
       if (temporalSyncFlag) { //do the temporal synchronisation
-        //TODO: add the temporal synchronisation stuff
-        //if the button is checked, get the phase of the requested US frame from the available signal
-        //and select the corresponding one in the CT. (check the one just before, and the one just after, and select the closest)
-
-        //TODO: do it also the other way around, when modifying the time index related to CT, select a close frame
-        //this should not be done here directly, but the code should be inspired from the one here
-        //->find a good US frame such that when calling this function with this US frame, it produces the expected result
-
-
-        //TODO: select the right CT image to display
         int mainSequenceFrameIndex=0;
         //estimate the TSlice to set to the CT
-
+        unsigned nbFramesMain = mSlicerManagers[index]->GetImage()->GetTransform().size();
+        mainSequenceFrameIndex = mSlicerManagers[index]->GetFusionSequenceCorrespondances()[ nbFramesMain + fusionSequenceFrameIndex];
         //and set it!
         mSlicerManagers[index]->SetTSlice(mainSequenceFrameIndex, false);
+        //warning, there is a loopback, and modification of the TSlice in main sequence forces an update of the TSlice in secondary, etc... 
       }
 
 
@@ -2925,12 +2938,13 @@ void vvMainWindow::HorizontalSliderMoved(int value,int column, int slicer_index)
           if (mSlicerManagers[i]->GetFusionSequenceTemporalSyncFlag()) {            
             //WARNING: for some obscure reason, there are problems when accessing mSlicerManagers[mSlicerManagers[i]->GetFusionSequenceIndexOfLinkedManager()]->GetFusionSequenceFrameIndex();
 
-            //int estimatedValue=mSlicerManagers[mSlicerManagers[i]->GetFusionSequenceIndexOfLinkedManager()]->GetFusionSequenceFrameIndex();
             int estimatedValue=0;
-            //TODO: if temporal sync is active
             //estimate a corresponding time index for the secondary (US) sequence, and update it accordingly.
-            //estimatedValue = ...
-            overlayPanel->updateFusionSequenceSliderValueFromWindow(estimatedValue, true);
+            estimatedValue = mSlicerManagers[i]->GetFusionSequenceCorrespondances()[ value ];       
+            //TODO: at the moment, there is a loop in TSlice modifications
+            //modifying sequence 1 causes seq 2 to update, which in turns update seq1...
+            //I disable control on seq1 at the moment.
+            //overlayPanel->updateFusionSequenceSliderValueFromWindow(estimatedValue, true);
           }
         }
       }

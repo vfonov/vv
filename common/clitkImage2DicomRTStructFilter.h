@@ -2,7 +2,7 @@
   Program:         vv http://www.creatis.insa-lyon.fr/rio/vv
   Main authors :   XX XX XX
 
-  Authors belongs to: 
+  Authors belongs to:
   - University of LYON           http://www.universite-lyon.fr/
   - Léon Bérard cancer center    http://www.centreleonberard.fr
   - CREATIS CNRS laboratory      http://www.creatis.insa-lyon.fr
@@ -31,7 +31,7 @@ namespace clitk {
   //--------------------------------------------------------------------
   template<class PixelType>
   class Image2DicomRTStructFilter: public clitk::FilterBase {
-    
+
   public:
     Image2DicomRTStructFilter();
     ~Image2DicomRTStructFilter();
@@ -41,18 +41,32 @@ namespace clitk {
     typedef typename clitk::DicomRT_StructureSet::Pointer DicomRTStructPointer;
 
     // Set inputs
-    itkSetMacro(Input, ImagePointer);
-    itkGetConstMacro(Input, ImagePointer);
-    
+    virtual void SetInputFilenames (const std::vector<std::string> _arg)
+    {
+      if ( this->m_InputFilenames != _arg )
+      {
+        this->m_InputFilenames = _arg;
+        this->Modified();
+      }
+    }
+    itkSetMacro(StructureSetFilename, std::string);
+    itkSetMacro(DicomFolder, std::string);
+    itkSetMacro(OutputFilename, std::string);
+    void SetROIType(std::string type);
+    itkSetMacro(ThresholdValue, PixelType);
+    itkSetMacro(SkipInitialStructuresFlag, bool);
+
     // Run filter
-    void Update();    
-    
-    // Get output
-    itkGetConstMacro(DicomRTStruct, DicomRTStructPointer);
+    void Update();
 
   protected:
-    ImagePointer m_Input;
-    DicomRTStructPointer m_DicomRTStruct;
+    std::string m_StructureSetFilename;
+    std::string m_DicomFolder;
+    std::string m_OutputFilename;
+    std::string m_ROIType;
+    PixelType m_ThresholdValue;
+    std::vector<std::string> m_InputFilenames;
+    bool m_SkipInitialStructuresFlag;
   };
   //--------------------------------------------------------------------
 

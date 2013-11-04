@@ -43,6 +43,8 @@
 #  include <stdint.h>
 #endif
 
+#define VTK_EXCLUDE_STRSTREAM_HEADERS
+
 //--------------------------------------------------------------------
 namespace clitk {
 
@@ -234,6 +236,11 @@ namespace clitk {
   void MapToVecFirst(const M & m, V & v);
   template <typename M, typename V> 
   void MapToVecSecond(const M & m, V & v);
+
+  //--------------------------------------------------------------------
+  // Find/replace string
+  template<class T>
+  int inline findAndReplace(T& source, const T& find, const T& replace);
 
 #include "clitkCommon.txx"
 

@@ -54,6 +54,8 @@ ResampleImageWithOptionsFilter():itk::ImageToImageFilter<InputImageType, OutputI
     m_OutputSpacing[i] = -1;
     m_GaussianSigma[i] = -1;
   }
+  m_OutputOrigin.Fill(0);
+  m_OutputDirection.SetIdentity();
   m_VerboseOptions = false;
   SetDefaultPixelValue(0);
 }
@@ -222,15 +224,22 @@ GenerateData()
     std::cout << "LastDimIsTime  = " << m_LastDimensionIsTime << std::endl;
   }
 
+  // Compute origin based on image corner
+  typename FilterType::OriginPointType origin = input->GetOrigin();
+  for(unsigned int i=0; i<OutputImageType::ImageDimension; i++) {
+    origin[i] -= 0.5 * input->GetSpacing()[i];
+    origin[i] += 0.5 * m_OutputSpacing[i];
+  }
+
   // Instance of the transform object to be passed to the resample
   // filter. By default, identity transform is applied
   filter->SetTransform(m_Transform);
   filter->SetSize(m_OutputSize);
   filter->SetOutputSpacing(m_OutputSpacing);
-  filter->SetOutputOrigin(input->GetOrigin());
+  filter->SetOutputOrigin(m_OutputOrigin);
   filter->SetDefaultPixelValue(m_DefaultPixelValue);
   filter->SetNumberOfThreads(this->GetNumberOfThreads()); 
-  filter->SetOutputDirection(input->GetDirection()); // <-- NEEDED if we want to keep orientation (in case of PermutAxes for example)
+  filter->SetOutputDirection(m_OutputDirection); // <-- NEEDED if we want to keep orientation (in case of PermutAxes for example)
 
   // Select interpolator
   switch (m_InterpolationType) {

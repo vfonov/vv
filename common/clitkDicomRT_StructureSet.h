@@ -28,7 +28,15 @@
 #include "vvImage.h"
 
 // gdcm
+#include "clitkConfiguration.h"
+#if CLITK_USE_SYSTEM_GDCM == 1
+#include <vtkGDCMPolyDataReader.h>
+#include <vtkRTStructSetProperties.h>
+#endif
+
+// gdcm
 #if GDCM_MAJOR_VERSION == 2
+// This is not use if CLITK_USE_SYSTEM_GDCM==1
 #include "gdcmReader.h"
 #include "gdcmWriter.h"
 #include "gdcmAttribute.h"
@@ -44,8 +52,9 @@ public:
   typedef itk::SmartPointer<Self> Pointer;
   itkNewMacro(Self);
 
-  typedef std::map<int, clitk::DicomRT_ROI::Pointer>::iterator ROIIteratorType;
-  typedef std::map<int, clitk::DicomRT_ROI::Pointer>::const_iterator ROIConstIteratorType;
+  typedef std::map<int, clitk::DicomRT_ROI::Pointer> ROIMapContainer;
+  typedef ROIMapContainer::iterator ROIIteratorType;
+  typedef ROIMapContainer::const_iterator ROIConstIteratorType;
 
   void Print(std::ostream & os = std::cout) const;
   void Read(const std::string & filename);
@@ -53,7 +62,11 @@ public:
   void Write(const std::string & filename);
 
   clitk::DicomRT_ROI * GetROIFromROINumber(int n);
-  std::map<int, clitk::DicomRT_ROI::Pointer> & GetROIs() { return mROIs; }
+  clitk::DicomRT_ROI* GetROIFromROIName(const std::string& name);
+  //clitk::DicomRT_ROI* GetROIFromROINameRegEx(const std::string& regEx);
+  clitk::DicomRT_ROI* GetROIFromROINameSubstr(const std::string& s);
+  ROIMapContainer * GetROIsFromROINameSubstr(const std::string& s);
+  ROIMapContainer & GetROIs() { return mROIs; }
   const std::string & GetStudyID() const;
   const std::string & GetStudyTime() const;
   const std::string & GetStudyDate() const;

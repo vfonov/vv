@@ -7,7 +7,6 @@ if(COMMAND cmake_policy)
 endif(COMMAND cmake_policy)
 #=========================================================
 
-
 #=========================================================
 #List of vv tools to compile
 SET(vv_TOOLS
@@ -17,19 +16,19 @@ SET(vv_TOOLS
   vvToolBinarize
   vvToolImageArithm
   vvToolResample
-#   vvToolExtractPatient
-#  vvToolExtractLung
-  vvToolStructureSetManager
   vvToolMIP
   vvToolConvert ## with dummy vvToolConvert.ui
   vvToolROIManager
   vvToolSegmentation
-
   ## these ones are for tests (not working)
   # vvToolFoo
   # vvToolFooWithWidgetBase
   # vvToolPlastimatch
   # vvToolConnectedComponentLabeling  
+  ## these ones are old ones
+  # vvToolExtractPatient
+  # vvToolExtractLung
+  # vvToolStructureSetManager
 )
 # dependencies of the tools
 # Future issues : when tool depend on other tools ... how to manage that ?
@@ -43,6 +42,7 @@ SET(vvToolCropImage_LIBS clitkCropImageLib)
 SET(vvToolMIP_LIBS clitkMIPLib)
 SET(vvToolMedianFilter_LIBS clitkMedianImageFilterLib)
 SET(vvToolImageArithm_LIBS clitkImageArithmImageLib)
+SET(vvToolROIManager_LIBS clitkDicomRTStruct)
 
 #=========================================================
 # List of vv source files
@@ -195,11 +195,13 @@ INCLUDE_DIRECTORIES(
   )
 
 LINK_DIRECTORIES(${QT_LIBRARY_DIR})
+
 #=========================================================
 #Add each tool's dependencies
 foreach(tool ${vv_TOOLS})
   SET(toolLibs ${toolLibs} ${${tool}_LIBS})
 endforeach(tool)
+
 #=========================================================
 #Add Foundation Libraries (this should be after our libraries, since we depend
 #on them)
@@ -217,7 +219,7 @@ ENDIF(CLITK_EXPERIMENTAL)
 
 #=========================================================
 #Create binary and libs for tests
-SET(vvExternalLibs ${QT_QTNETWORK_LIBRARY} clitkSegmentationGgoLib clitkDicomRTStruct ${toolLibs} ${foundationLibraries} ${vvCxImage})
+SET(vvExternalLibs ${QT_QTNETWORK_LIBRARY} clitkSegmentationGgoLib ${toolLibs} ${foundationLibraries} ${vvCxImage})
 # QtNetwork is required by vvRegisterForm
 
 ADD_LIBRARY(vvLib ${vv_SRCS} ${vv_UI_CXX})
@@ -229,31 +231,12 @@ ELSE(WIN32)
   ADD_EXECUTABLE(vv vv.cxx)
 ENDIF(WIN32)
 
-#TARGET_LINK_LIBRARIES(vv vvLib)
 TARGET_LINK_LIBRARIES(vv vvLib)
-
 
 #=========================================================
 # Install options (also used by CPack)
-IF(UNIX OR APPLE)
-#   SET_TARGET_PROPERTIES(vv
-#     PROPERTIES INSTALL_RPATH "${VTK_DIR}:${ITK_DIR}")
-  INSTALL (TARGETS vv DESTINATION bin PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_EXECUTE WORLD_EXECUTE)
-  #  INSTALL (FILES ${CMAKE_CURRENT_SOURCE_DIR}/icons/ducky.png DESTINATION .)
+INSTALL (TARGETS vv DESTINATION bin PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_EXECUTE WORLD_EXECUTE)
 
-  #QT
-  #FOREACH(LIB QtCore QtGui QtOpenGL QtNetwork QtSql)
-  #  INSTALL(FILES "${QT_LIBRARY_DIR}/lib${LIB}.so.${QT_VERSION_MAJOR}.${QT_VERSION_MINOR}.${QT_VERSION_PATCH}"
-  #          RENAME "lib${LIB}.so.${QT_VERSION_MAJOR}"
-  #          DESTINATION .)
-  #ENDFOREACH(LIB)
-ENDIF(UNIX OR APPLE)
-
-IF(WIN32)
-  #INCLUDE(InstallRequiredSystemLibraries)
-  INSTALL(TARGETS vv DESTINATION bin)
-  #INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/icons/ducky.png DESTINATION .)
-ENDIF(WIN32)
 #=========================================================
 
 #=========================================================
@@ -267,7 +250,11 @@ SET(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/License.txt")
 SET(CPACK_PACKAGE_VERSION_MAJOR "1")
 SET(CPACK_PACKAGE_VERSION_MINOR "3")
 SET(CPACK_PACKAGE_VERSION_PATCH "0")
-SET(CPACK_PACKAGE_INSTALL_DIRECTORY "vv")
+IF(NIGHTLY)
+  SET(CPACK_PACKAGE_INSTALL_DIRECTORY "vv-nightly")
+ELSE(NIGHTLY)
+  SET(CPACK_PACKAGE_INSTALL_DIRECTORY "vv")
+ENDIF(NIGHTLY)
 SET(CPACK_STRIP_FILES TRUE)
 
 IF(WIN32)
@@ -275,11 +262,15 @@ IF(WIN32)
   # sure there is at least one set of four (4) backlasshes.
   SET(CPACK_NSIS_MUI_ICON "${CMAKE_CURRENT_SOURCE_DIR}\\\\icons\\\\ducky.ico")
   SET(CPACK_NSIS_INSTALLED_ICON_NAME "vv.exe")
+IF(NIGHTLY)
+  SET(CPACK_NSIS_DISPLAY_NAME "vv - The 4D slicer (nightly)")
+ELSE(NIGHTLY)
   SET(CPACK_NSIS_DISPLAY_NAME "vv - The 4D slicer")
+ENDIF(NIGHTLY)
   SET(CPACK_NSIS_HELP_LINK "http://www.creatis.insa-lyon.fr/rio/vv")
   SET(CPACK_NSIS_URL_INFO_ABOUT "http://www.creatis.insa-lyon.fr/rio")
   SET(CPACK_NSIS_CONTACT "vv@creatis.insa-lyon.fr")
-  SET(CPACK_NSIS_CREATE_ICONS_EXTRA "CreateShortCut \\\"$SMPROGRAMS\\\\$STARTMENU_FOLDER\\\\vv.lnk\\\" \\\"$INSTDIR\\\\vv.exe\\\" ")
+  SET(CPACK_NSIS_CREATE_ICONS_EXTRA "CreateShortCut \\\"$SMPROGRAMS\\\\$STARTMENU_FOLDER\\\\vv.lnk\\\" \\\"$INSTDIR\\\\bin\\\\vv.exe\\\" ")
   SET(CPACK_NSIS_DELETE_ICONS_EXTRA "Delete \\\"$SMPROGRAMS\\\\$MUI_TEMP\\\\vv.lnk\\\" ")
   #SET(CPACK_NSIS_MODIFY_PATH ON) SR: buggy, wait for cmake updates for a fix
   #SET(CPACK_BINARY_ZIP ON)

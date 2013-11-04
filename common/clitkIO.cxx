@@ -34,6 +34,7 @@
 #include "rtkHndImageIOFactory.h"
 #include "rtkEdfImageIOFactory.h"
 #include "rtkImagXImageIOFactory.h"
+#include "rtkXRadImageIOFactory.h"
 #include "clitkEsrfHstImageIOFactory.h"
 #include "clitkGateAsciiImageIOFactory.h"
 #include "clitkConfiguration.h"
@@ -42,11 +43,23 @@
   #include "clitkUSVoxImageIOFactory.h"
   #include "clitkSvlImageIOFactory.h"
 #endif
+#if ITK_VERSION_MAJOR >= 4
+  #include "itkGDCMImageIOFactory.h"
+#endif
 
 //--------------------------------------------------------------------
 // Register factories
 void clitk::RegisterClitkFactories()
 {
+#if ITK_VERSION_MAJOR >= 4
+  std::list< itk::ObjectFactoryBase * > fl = itk::GDCMImageIOFactory::GetRegisteredFactories();
+  for (std::list< itk::ObjectFactoryBase * >::iterator it = fl.begin(); it != fl.end(); ++it)
+    if (dynamic_cast<itk::GDCMImageIOFactory *>(*it))
+    {
+      itk::GDCMImageIOFactory::UnRegisterFactory(*it);
+      break;
+    }
+#endif
 #if CLITK_PRIVATE_FEATURES
   clitk::UsfImageIOFactory::RegisterOneFactory();
   clitk::USVoxImageIOFactory::RegisterOneFactory();
@@ -64,6 +77,10 @@ void clitk::RegisterClitkFactories()
   rtk::HndImageIOFactory::RegisterOneFactory();
   rtk::EdfImageIOFactory::RegisterOneFactory();
   rtk::ImagXImageIOFactory::RegisterOneFactory();
+  rtk::XRadImageIOFactory::RegisterOneFactory();
   clitk::EsrfHstImageIOFactory::RegisterOneFactory();
+#if ITK_VERSION_MAJOR >= 4
+  itk::GDCMImageIOFactory::RegisterOneFactory();
+#endif
 } ////
 

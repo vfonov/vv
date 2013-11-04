@@ -55,7 +55,7 @@ class vvMainWindow: public vvMainWindowBase,
   vvSlicerManager * AddImage(vvImage::Pointer image,std::string filename);
   void AddField(QString file,int index);
   void AddOverlayImage(int index, std::vector<std::string> fileNames, vvImageReader::LoadedImageType type);
-  void AddFusionImage(int index, QString filename);
+  void AddFusionImage(int index, std::vector<std::string> fileNames, vvImageReader::LoadedImageType type);
   void AddROI(int index, QString filename);
 
   //Process the sequence for fusion:
@@ -69,7 +69,6 @@ class vvMainWindow: public vvMainWindowBase,
   void SaveCurrentStateAs(const std::string& stateFile);
   void ReadSavedStateFile(const std::string& stateFile);
 	void LinkAllImages();
-  QString Get4x4MatrixDoubleAsString(vtkSmartPointer<vtkMatrix4x4> matrix, const int precision=3);
 
   virtual void UpdateCurrentSlicer();
   virtual QTabWidget * GetTab();
@@ -161,7 +160,7 @@ public slots:
   void SelectFusionImage();
   //select the file(s) from the disk containing the image sequence to fuse
   void SelectFusionSequence();
-  void SelectFusionSequenceTemporalSignal();
+  void SelectFusionSequenceCorrespondances();
 
   void ResetTransformationToIdentity();
 

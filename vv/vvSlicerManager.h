@@ -47,6 +47,18 @@ class vvImageReader;
 class vvImageReader;
 class vvLandmarks;
 
+enum WindowLevelPreset {
+  WL_AUTO,
+  WL_HOUNSFIELD,
+  WL_SOFTTISSUE,
+  WL_LUNGS,
+  WL_BONES,
+  WL_HEAD,
+  WL_BINARY,
+  WL_USER,
+  WL_VENTILATION
+};
+
 //------------------------------------------------------------------------------
 class vvSlicerManager : public QObject {
   Q_OBJECT
@@ -65,7 +77,7 @@ class vvSlicerManager : public QObject {
   bool SetImages(std::vector<std::string> filenames, vvImageReader::LoadedImageType type, int n=0);
 
   bool SetOverlay(std::vector<std::string> filenames, int dim, std::string component, vvImageReader::LoadedImageType type);
-  bool SetFusion(std::string filename, int dim, std::string component);
+  bool SetFusion(std::vector<std::string> filenames,int dim, std::string component, vvImageReader::LoadedImageType type);
   bool SetFusionSequence(std::vector<std::string> filenames, int dim, std::string component, vvImageReader::LoadedImageType type);
   ///Set a VF by loading it from the disk
   bool SetVF(std::string filename);
@@ -165,7 +177,7 @@ class vvSlicerManager : public QObject {
 		mFusionSequenceListInitialTransformMatrices.push_back( tmpMat );
   }
   void SetFusionSequenceIndexOfLinkedManager(int index) { mFusionSequenceIndexLinkedManager = index; }
-  void SetFusionSequenceTemporalSignal(std::vector<double> s) { mFusionSequenceTemporalSignal = s; }
+  void SetFusionSequenceCorrespondances(std::vector<unsigned> s) { mFusionSequenceCorrespondances = s; }
   
   void SetFusionSequenceInvolvmentCode(int code) { mFusionSequenceInvolvementCode=code; }
   int GetFusionSequenceInvolvmentCode() { return mFusionSequenceInvolvementCode;}
@@ -183,7 +195,7 @@ class vvSlicerManager : public QObject {
   const vtkSmartPointer<vtkMatrix4x4>& GetFusionSequenceInitialTransformMatrixAtFrame(unsigned i) {
 	  return mFusionSequenceListInitialTransformMatrices[i];
   }
-  const std::vector<double>& GetFusionSequenceTemporalSignal() {return mFusionSequenceTemporalSignal;}
+  const std::vector<unsigned>& GetFusionSequenceCorrespondances() {return mFusionSequenceCorrespondances;}
 
   double GetColorWindow() const;
   double GetColorLevel() const;
@@ -320,7 +332,7 @@ protected:
   bool mFusionSequenceSpatialSyncFlag, mFusionSequenceTemporalSyncFlag; //flags indicating whether the spatial/temporal synchronization are actives
   vtkSmartPointer<vtkMatrix4x4> mFusionSequenceMainTransform;
   std::vector< vtkSmartPointer<vtkMatrix4x4> > mFusionSequenceListInitialTransformMatrices;
-  std::vector<double> mFusionSequenceTemporalSignal;
+  std::vector<unsigned> mFusionSequenceCorrespondances;
   
   int mPreset;
   SlicingPresetType mSlicingPreset;

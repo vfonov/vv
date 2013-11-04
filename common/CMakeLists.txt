@@ -24,6 +24,8 @@ SET(clitkCommon_SRC
   rtkHndImageIOFactory.cxx
   rtkEdfImageIO.cxx
   rtkEdfImageIOFactory.cxx
+  rtkXRadImageIO.cxx
+  rtkXRadImageIOFactory.cxx
   rtkImagXImageIO.cxx
   rtkImagXImageIOFactory.cxx
   rtkImagXXMLFileReader.cxx
@@ -37,6 +39,7 @@ SET(clitkCommon_SRC
   clitkExceptionObject.cxx
   clitkFilterBase.cxx
   clitkMemoryUsage.cxx
+  clitkMatrix.cxx
   vvImage.cxx
   vvImageReader.cxx
   vvImageWriter.cxx
@@ -55,38 +58,29 @@ ENDIF(CLITK_PRIVATE_FEATURES)
 ### Declare clitkCommon library
 ADD_LIBRARY(clitkCommon STATIC ${clitkCommon_SRC})
 
-IF(NOT ${LIBSTATGRAB} MATCHES "LIBSTATGRAB-NOTFOUND")
+IF(CLITK_MEMORY_INFO)
   TARGET_LINK_LIBRARIES(clitkCommon statgrab)
-ENDIF(NOT ${LIBSTATGRAB} MATCHES "LIBSTATGRAB-NOTFOUND")
+ENDIF(CLITK_MEMORY_INFO)
 
-### Check if ITK was compiled with SYSTEM_GDCM = ON and set the gdcm libraries accordingly
-SET(CLITK_USE_SYSTEM_GDCM FALSE)
-IF(ITK_VERSION_MAJOR LESS "4")
-  IF(ITK_USE_SYSTEM_GDCM)
-    SET(CLITK_USE_SYSTEM_GDCM TRUE) 
-  ENDIF(ITK_USE_SYSTEM_GDCM)
-ELSE(ITK_VERSION_MAJOR LESS "4")
-  SET(GDCM_INCLUDE_INSTALL ".*include/gdcm-.*")
-  SET(GDCM_INCLUDE_BUILD ".*/Source/MediaStorageAndFileFormat")
-  IF(ITKGDCM_INCLUDE_DIRS MATCHES ${GDCM_INCLUDE_BUILD} OR ITKGDCM_INCLUDE_DIRS MATCHES ${GDCM_INCLUDE_INSTALL})
-    SET(CLITK_USE_SYSTEM_GDCM TRUE)
-  ENDIF(ITKGDCM_INCLUDE_DIRS MATCHES ${GDCM_INCLUDE_BUILD} OR ITKGDCM_INCLUDE_DIRS MATCHES ${GDCM_INCLUDE_INSTALL})
-ENDIF(ITK_VERSION_MAJOR LESS "4")
 
-IF(CLITK_USE_SYSTEM_GDCM)
-  SET(CLITK_GDCM_LIBRARIES gdcmDSED) 
-ENDIF(CLITK_USE_SYSTEM_GDCM)
+#=========================================================
+IF (CLITK_USE_SYSTEM_GDCM)
+  FIND_PACKAGE(GDCM REQUIRED)
+  include(${GDCM_USE_FILE})
+  TARGET_LINK_LIBRARIES(clitkCommon vtkgdcm gdcmDICT gdcmMSFF)
+ENDIF()
+#=========================================================
 
-TARGET_LINK_LIBRARIES(clitkCommon vtkCommon vtkImaging ${ITK_LIBRARIES} ${CLITK_GDCM_LIBRARIES})
+TARGET_LINK_LIBRARIES(clitkCommon ${VTK_LIBRARIES} ${ITK_LIBRARIES})
 
 ADD_LIBRARY(clitkDicomRTStruct STATIC
   clitkDicomRT_Contour.cxx
   clitkDicomRT_ROI.cxx
   clitkDicomRT_StructureSet.cxx
   clitkDicomRTStruct2ImageFilter.cxx
-)
+  )
 
-TARGET_LINK_LIBRARIES(clitkDicomRTStruct vtkHybrid ${CLITK_GDCM_LIBRARIES}) 
+TARGET_LINK_LIBRARIES(clitkDicomRTStruct clitkCommon)
 
 #ADD_LIBRARY(clitkCommonShared SHARED ${clitkCommon_SRC})
 #SET_TARGET_PROPERTIES(clitkCommonShared PROPERTIES COMPILE_FLAGS -fPIC)

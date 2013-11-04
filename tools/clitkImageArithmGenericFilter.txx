@@ -45,8 +45,6 @@ template<unsigned int Dim>
 void ImageArithmGenericFilter<args_info_type>::InitializeImageType()
 {
   ADD_DEFAULT_IMAGE_TYPES(Dim);
-  ADD_VEC_IMAGE_TYPE(3u,3u,float);
-  ADD_VEC_IMAGE_TYPE(3u,3u,double);
 }
 //--------------------------------------------------------------------
 
@@ -389,6 +387,18 @@ void clitk::ImageArithmGenericFilter<args_info_type>::ComputeImage(Iter1 it, Ite
   case 11: // divide
     while (!it.IsAtEnd()) {
       ito.Set(PixelTypeDownCast<double, PixelType>((double)it.Get() / mScalar) );
+      ++it;
+      ++ito;
+    }
+    break;
+  case 13: // -ln I/I0
+    while (!it.IsAtEnd()) {
+      if (it.Get() == 0) { // special case for fluence image with 0 value in a pixel -> consider 0.5
+        ito.Set(-log(0.5 / mScalar) );
+      }
+      else {
+        ito.Set(PixelTypeDownCast<double, PixelType>(-log((double)it.Get() / mScalar)) );
+      }
       ++it;
       ++ito;
     }

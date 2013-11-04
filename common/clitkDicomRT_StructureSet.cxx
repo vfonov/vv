@@ -118,6 +118,101 @@ clitk::DicomRT_ROI* clitk::DicomRT_StructureSet::GetROIFromROINumber(int n)
 }
 //--------------------------------------------------------------------
 
+//--------------------------------------------------------------------
+clitk::DicomRT_ROI* clitk::DicomRT_StructureSet::GetROIFromROIName(const std::string& name)
+{
+  std::map<int, std::string>::iterator it = mMapOfROIName.begin();
+  int number = -1;
+  while (it != mMapOfROIName.end() && number == -1) {
+    if (it->second == name)
+      number = it->first;
+    else
+      it++;
+  }
+
+  if (number == -1) {
+    std::cerr << "No ROI name " << name << std::endl;
+    return NULL;
+  }
+  
+  return mROIs[number];
+}
+//--------------------------------------------------------------------
+/*
+// RP: 08/02/2013
+// RegEx version shall be available when C++x11 supports it propely
+//
+//--------------------------------------------------------------------
+clitk::DicomRT_ROI* clitk::DicomRT_StructureSet::GetROIFromROINameRegEx(const std::string& regEx)
+{
+  std::map<int, std::string>::iterator it = mMapOfROIName.begin();
+  int number = -1;
+
+  while (it != mMapOfROIName.end() && number == -1) {
+    if (std::tr1::regex_match (it->second, std::tr1::regex(regEx)))
+      number = it->first;
+    else
+      it++;
+  }
+
+  if (number == -1) {
+    std::cerr << "No ROI name " << number << std::endl;
+    return NULL;
+  }
+  
+  return mROIs[number];
+}
+//--------------------------------------------------------------------
+*/
+//--------------------------------------------------------------------
+clitk::DicomRT_ROI* clitk::DicomRT_StructureSet::GetROIFromROINameSubstr(const std::string& s)
+{
+  std::map<int, std::string>::iterator it = mMapOfROIName.begin();
+  int number = -1;
+
+  while (it != mMapOfROIName.end() && number == -1) {
+    if (it->second.find(s) != std::string::npos)
+      number = it->first;
+    else
+      it++;
+  }
+
+  if (number == -1) {
+    std::cerr << "No ROI name " << s << std::endl;
+    return NULL;
+  }
+  
+  return mROIs[number];
+}
+//--------------------------------------------------------------------
+
+//--------------------------------------------------------------------
+clitk::DicomRT_StructureSet::ROIMapContainer * 
+clitk::DicomRT_StructureSet::GetROIsFromROINameSubstr(const std::string& s)
+{
+  static ROIMapContainer rois;
+  rois.clear();
+  
+  ROIMapContainer::iterator it = mROIs.begin();
+  int number = -1;
+
+  while (it != mROIs.end()) {
+    if (it->second->GetName().find(s) != std::string::npos) {
+      number = it->first;
+      rois[number] = it->second;
+    }
+    it++;
+  }
+
+  if (number == -1) {
+    std::cerr << "No ROI name " << s << std::endl;
+    return NULL;
+  }
+  
+  return &rois;
+  
+}
+//--------------------------------------------------------------------
 
 //--------------------------------------------------------------------
 void clitk::DicomRT_StructureSet::Print(std::ostream & os) const
@@ -153,7 +248,6 @@ int clitk::DicomRT_StructureSet::ReadROINumber(const gdcm::Item & item)
 void clitk::DicomRT_StructureSet::Write(const std::string & filename)
 {
 #if GDCM_MAJOR_VERSION == 2
-  DD("DCM RT Writer");
 
   // Assert that the gdcm file is still open (we can write only if it was readed)
   if (mFile == NULL) {
@@ -162,8 +256,10 @@ void clitk::DicomRT_StructureSet::Write(const std::string & filename)
   }
 
   // Loop and update each ROI 
+  int i=0;
   for(ROIIteratorType iter = mROIs.begin(); iter != mROIs.end(); iter++) {
     iter->second->UpdateDicomItem();
+    i++;
   }
 
   // Write [ Structure Set ROI Sequence ] = 0x3006,0x0020
@@ -215,8 +311,37 @@ void clitk::DicomRT_StructureSet::Write(const std::string & filename)
 //--------------------------------------------------------------------
 void clitk::DicomRT_StructureSet::Read(const std::string & filename)
 {
+#if CLITK_USE_SYSTEM_GDCM == 1
+  vtkSmartPointer<vtkGDCMPolyDataReader> reader = vtkGDCMPolyDataReader::New();
+  reader->SetFileName(filename.c_str());
+  reader->Update();
+  
+  // Get global information
+  vtkRTStructSetProperties * p = reader->GetRTStructSetProperties();  
+  mStudyID   = p->GetStudyInstanceUID();
+  mStudyDate = p->GetStructureSetDate();
+  mLabel     = p->GetStructureSetLabel();
+  mName      = p->GetStructureSetName();
+  mTime      = p->GetStructureSetTime();
+
+  int n = p->GetNumberOfStructureSetROIs();
+  for(unsigned int i=0; i<n; i++) {
+    // Get the roi number
+    int roinumber = p->GetStructureSetROINumber(i);
+    // Create the roi
+    DicomRT_ROI::Pointer roi = DicomRT_ROI::New();
+    roi->Read(reader, i);
+    // Insert in the map
+    mROIs[roinumber] = roi;
+  }
+  return;
+#endif // END version with system gdcm (vtkGDCMPolyDataReader)
+
+
   // Open DICOM
 #if GDCM_MAJOR_VERSION == 2
+  FATAL("Error : compile vv with itk4 + external gdcm");
+
   // Read gdcm file
   mReader = new gdcm::Reader;
   mReader->SetFileName(filename.c_str());
@@ -270,6 +395,16 @@ void clitk::DicomRT_StructureSet::Read(const std::string & filename)
   // Temporary store the list of items
   std::map<int, gdcm::Item*> mMapOfROIInfo;
   std::map<int, gdcm::Item*> mMapOfROIContours;
+ 
+std::map<int, clitk::DicomRT_ROI::Pointer> mROIs;
+  std::map<int, std::string> mMapOfROIName;
+#if GDCM_MAJOR_VERSION == 2
+  gdcm::Reader * mReader;
+  gdcm::SmartPointer<gdcm::SequenceOfItems> mROIInfoSequenceOfItems;
+  gdcm::SmartPointer<gdcm::SequenceOfItems> mROIContoursSequenceOfItems;  
+#endif
+  gdcm::File * mFile;
+
 
   //----------------------------------
   // Read all ROI Names and number

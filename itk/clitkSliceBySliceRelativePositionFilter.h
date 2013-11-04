@@ -137,5 +137,4 @@ namespace clitk {
 #ifndef ITK_MANUAL_INSTANTIATION
 #include "clitkSliceBySliceRelativePositionFilter.txx"
 #endif
-
 #endif

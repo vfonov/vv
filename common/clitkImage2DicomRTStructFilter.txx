@@ -23,6 +23,7 @@
 
 // clitk
 #include "clitkImage2DicomRTStructFilter.h"
+#include "clitkBinaryImageToMeshFilter.h"
 #include "clitkImageCommon.h"
 #include "vvFromITK.h"
 
@@ -34,15 +35,34 @@
 #include <vtkMetaImageWriter.h>
 #include <vtkImageData.h>
 
+// FIXME to remove
+#include "vtkPolyDataMapper.h"
+#include "vtkPolyDataMapper2D.h"
+#include "vtkRenderWindowInteractor.h"
+#include "vtkPolyDataReader.h"
+#include "vtkRenderWindow.h"
+#include "vtkRenderer.h"
+#include "vtkCamera.h"
+#include "vtkProperty.h"
+#include "vtkProperty2D.h"
+#include <vtksys/SystemTools.hxx>
+
 // itk
 #include <itkImage.h>
 #include <itkVTKImageToImageFilter.h>
+
+// gdcm
+#include <vtkGDCMPolyDataWriter.h>
 
 //--------------------------------------------------------------------
 template<class PixelType>
 clitk::Image2DicomRTStructFilter<PixelType>::Image2DicomRTStructFilter()
 {
-  DD("Image2DicomRTStructFilter Const");
+  m_StructureSetFilename = "";
+  m_DicomFolder = "";
+  m_OutputFilename = "default-output.dcm";
+  m_ThresholdValue = 0.5;
+  m_SkipInitialStructuresFlag = false;
 }
 //--------------------------------------------------------------------
 
@@ -51,7 +71,16 @@ clitk::Image2DicomRTStructFilter<PixelType>::Image2DicomRTStructFilter()
 template<class PixelType>
 clitk::Image2DicomRTStructFilter<PixelType>::~Image2DicomRTStructFilter()
 {
-  DD("Image2DicomRTStructFilter Destructor");
+}
+//--------------------------------------------------------------------
+
+
+//--------------------------------------------------------------------
+template<class PixelType>
+void
+clitk::Image2DicomRTStructFilter<PixelType>::SetROIType(std::string type)
+{
+  m_ROIType = type;
 }
 //--------------------------------------------------------------------
 
@@ -60,44 +89,157 @@ clitk::Image2DicomRTStructFilter<PixelType>::~Image2DicomRTStructFilter()
 template<class PixelType>
 void clitk::Image2DicomRTStructFilter<PixelType>::Update() 
 {
-  DD("Image2DicomRTStructFilter::GenerateData");
+  // Check this is a RT-Struct
+  gdcm::Reader gdcm_reader;
+  gdcm_reader.SetFileName(m_StructureSetFilename.c_str());
+  if (!gdcm_reader.Read()) {
+    clitkExceptionMacro("Error could not open the file '" << m_StructureSetFilename << std::endl);
+  }
+  gdcm::MediaStorage ms;
+  ms.SetFromFile(gdcm_reader.GetFile());
+  if (ms != gdcm::MediaStorage::RTStructureSetStorage) {
+    clitkExceptionMacro("File '" << m_StructureSetFilename << "' is not a DICOM-RT-Struct file." << std::endl);
+  }
 
-  // Read DicomRTStruct
-  std::string filename = "RS.zzQAnotmt_french01_.dcm";
-  clitk::DicomRT_StructureSet::Pointer structset = clitk::DicomRT_StructureSet::New();
-  structset->Read(filename);
+  // Read rt struct
+  vtkSmartPointer<vtkGDCMPolyDataReader> reader = vtkGDCMPolyDataReader::New();
+  reader->SetFileName(m_StructureSetFilename.c_str());
+  reader->Update();  
+
+  // Get properties
+  vtkRTStructSetProperties * p = reader->GetRTStructSetProperties();
+  if (GetVerboseFlag()) {
+    std::cout << "Number of structures in the dicom-rt-struct : " 
+              << p->GetNumberOfStructureSetROIs() << std::endl;
+  }
   
-  DD(structset->GetName());
-  clitk::DicomRT_ROI * roi = structset->GetROIFromROINumber(1); // Aorta
-  DD(roi->GetName());
-  DD(roi->GetROINumber());
 
-  // Add an image to the roi
-  vvImage::Pointer im = vvImageFromITK<3, PixelType>(m_Input);
-  roi->SetImage(im);
+  // number of additional contours
+  int m = m_InputFilenames.size();
 
-  // Get one contour
-  DD("Compute Mesh");
-  roi->ComputeMeshFromImage();
-  vtkSmartPointer<vtkPolyData> mesh = roi->GetMesh();
-  DD("done");
+  // Init writer
+  vtkGDCMPolyDataWriter * writer = vtkGDCMPolyDataWriter::New();
+  int numMasks = reader->GetNumberOfOutputPorts() + m;
+
+  if (m_SkipInitialStructuresFlag) {
+    numMasks = m;
+  }
+
+  writer->SetNumberOfInputPorts(numMasks);    
+  writer->SetFileName(m_OutputFilename.c_str());
+  writer->SetMedicalImageProperties(reader->GetMedicalImageProperties());
+
+  // List of already present rois
+  vtkStringArray* roiNames = vtkStringArray::New();
+  vtkStringArray* roiAlgorithms = vtkStringArray::New();
+  vtkStringArray* roiTypes = vtkStringArray::New();
+  roiNames->SetNumberOfValues(numMasks);
+  roiAlgorithms->SetNumberOfValues(numMasks);
+  roiTypes->SetNumberOfValues(numMasks);
   
-  // Change the mesh (shift by 10);
-  // const vtkSmartPointer<vtkPoints> & points = mesh->GetPoints();
-  // for(uint i=0; i<mesh->GetNumberOfVerts (); i++) {
-  //   DD(i);
-  //   double * p = points->GetPoint(i);
-  //   p[0] += 30;
-  //   points->SetPoint(i, p);
-  // }
-  roi->SetName("TOTO");
-  roi->SetDicomUptodateFlag(false); // indicate that dicom info must be updated from the mesh.
+  // Convert the image into a mesh
+  std::vector<vtkSmartPointer<vtkPolyData> > meshes;
+  std::vector<std::string> m_ROINames;
+  meshes.resize(m);
+  m_ROINames.resize(m);
+  for(unsigned int i=0; i<m; i++) {
     
-  // Convert to dicom ?
-  DD("TODO");
-  
-  // Write
-  structset->Write("toto.dcm");
+    // read image
+    //    typedef float PixelType;
+    //typedef itk::Image<PixelType, 3> ImageType;
+    ImagePointer input = clitk::readImage<ImageType>(m_InputFilenames[i], false);
+
+    std::ostringstream oss;
+    oss << vtksys::SystemTools::
+      GetFilenameName(vtksys::SystemTools::GetFilenameWithoutLastExtension(m_InputFilenames[i]));
+    std::string name = oss.str();
+    m_ROINames[i] = name;
+    
+    // convert to mesh
+    typedef clitk::BinaryImageToMeshFilter<ImageType> BinaryImageToMeshFilterType;
+    typename BinaryImageToMeshFilterType::Pointer convert = BinaryImageToMeshFilterType::New();
+    convert->SetThresholdValue(m_ThresholdValue);
+    convert->SetInput(input);
+    convert->Update();
+    meshes[i] = convert->GetOutputMesh();
+    if (GetVerboseFlag()) {
+      std::cout << "Mesh has " << meshes[i]->GetNumberOfLines() << " lines." << std::endl;
+    }
+    
+    /*
+    // debug mesh write  FIXME
+    vtkSmartPointer<vtkPolyDataWriter> wr = vtkSmartPointer<vtkPolyDataWriter>::New();
+    wr->SetInputConnection(convert->GetOutputPort()); //psurface->GetOutputPort()
+    wr->SetFileName("bidon.obj");
+    wr->Update();
+    wr->Write();
+    */
+  }
+    
+  // Copy previous contours
+  for (unsigned int i = 0; i < numMasks-m; ++i) {
+    writer->SetInput(i, reader->GetOutput(i));
+    std::string theString = reader->GetRTStructSetProperties()->GetStructureSetROIName(i);
+    roiNames->InsertValue(i, theString);
+    theString = reader->GetRTStructSetProperties()->GetStructureSetROIGenerationAlgorithm(i);
+    roiAlgorithms->InsertValue(i, theString);
+    theString = reader->GetRTStructSetProperties()->GetStructureSetRTROIInterpretedType(i);
+    roiTypes->InsertValue(i, theString);
+  }  
+
+  // Add new ones
+  for (unsigned int i = numMasks-m; i < numMasks; ++i) {
+    writer->SetInput(i, meshes[i-numMasks+m]);
+    roiNames->InsertValue(i, m_ROINames[i-numMasks+m]);
+    roiAlgorithms->InsertValue(i, "CLITK_CREATED");
+    roiTypes->InsertValue(i, m_ROIType);
+  }
+    
+  /*
+  //  Visu DEBUG
+  vtkPolyDataMapper *cubeMapper = vtkPolyDataMapper::New();
+  cubeMapper->SetInput( mesh );
+  cubeMapper->SetScalarRange(0,7);
+  vtkActor *cubeActor = vtkActor::New();
+  cubeActor->SetMapper(cubeMapper);
+  vtkProperty * property = cubeActor->GetProperty();
+  property->SetRepresentationToWireframe();
+
+  vtkRenderer *renderer = vtkRenderer::New();
+  vtkRenderWindow *renWin = vtkRenderWindow::New();
+  renWin->AddRenderer(renderer);
+
+  vtkRenderWindowInteractor *iren = vtkRenderWindowInteractor::New();
+  iren->SetRenderWindow(renWin);
+
+  renderer->AddActor(cubeActor);
+  renderer->ResetCamera();
+  renderer->SetBackground(1,1,1);
+
+  renWin->SetSize(300,300);
+
+  renWin->Render();
+  iren->Start();
+  */
+  // End visu
+
+  // Write (need to read dicom for slice id)
+  vtkRTStructSetProperties* theProperties = vtkRTStructSetProperties::New();
+  writer->SetRTStructSetProperties(theProperties);
+  if (GetVerboseFlag()) {
+    std::cout << "Looking for dicom info, study instance "
+              << p->GetStudyInstanceUID() << std::endl;
+  }
+  writer->InitializeRTStructSet(m_DicomFolder,
+                                reader->GetRTStructSetProperties()->GetStructureSetLabel(),
+                                reader->GetRTStructSetProperties()->GetStructureSetName(),
+                                roiNames, roiAlgorithms, roiTypes);  
+  writer->Write();
+  reader->Delete();
+  roiNames->Delete();
+  roiTypes->Delete();
+  roiAlgorithms->Delete();
+  writer->Delete();
 }
 //--------------------------------------------------------------------
 
