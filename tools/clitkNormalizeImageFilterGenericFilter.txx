@@ -15,11 +15,11 @@
   - BSD        See included LICENSE.txt file
   - CeCILL-B   http://www.cecill.info/licences/Licence_CeCILL-B_V1-en.html
 ===========================================================================**/
-#ifndef clitkImageGradientMagnitudeGenericFilter_txx
-#define clitkImageGradientMagnitudeGenericFilter_txx
+#ifndef clitkNormalizeImageFilterGenericFilter_txx
+#define clitkNormalizeImageFilterGenericFilter_txx
 
 /* =================================================
- * @file   clitkImageGradientMagnitudeGenericFilter.txx
+ * @file   clitkNormalizeImageFilterGenericFilter.txx
  * @author Jef Vandemeulebroucke <jef@creatis.insa-lyon.fr>
  * @date   29 june 2009
  *
@@ -28,8 +28,6 @@
  ===================================================*/
 
 // itk include
-#include "itkGradientMagnitudeImageFilter.h"
-#include "itkGradientMagnitudeRecursiveGaussianImageFilter.h"
 #include "itkLabelStatisticsImageFilter.h"
 #include "itkMaskImageFilter.h"
 #include "itkMaskNegatedImageFilter.h"
@@ -40,8 +38,8 @@ namespace clitk
 
     //--------------------------------------------------------------------
     template<class args_info_type>
-    ImageGradientMagnitudeGenericFilter<args_info_type>::ImageGradientMagnitudeGenericFilter():
-        ImageToImageGenericFilter<Self>("ImageGradientMagnitude")
+    NormalizeImageFilterGenericFilter<args_info_type>::NormalizeImageFilterGenericFilter():
+        ImageToImageGenericFilter<Self>("NormalizeImageFilter")
     {
         InitializeImageType<2>();
         InitializeImageType<3>();
@@ -52,7 +50,7 @@ namespace clitk
     //--------------------------------------------------------------------
     template<class args_info_type>
     template<unsigned int Dim>
-    void ImageGradientMagnitudeGenericFilter<args_info_type>::InitializeImageType()
+    void NormalizeImageFilterGenericFilter<args_info_type>::InitializeImageType()
     {
         ADD_DEFAULT_IMAGE_TYPES(Dim);
     }
@@ -61,7 +59,7 @@ namespace clitk
 
     //--------------------------------------------------------------------
     template<class args_info_type>
-    void ImageGradientMagnitudeGenericFilter<args_info_type>::SetArgsInfo(const args_info_type & a)
+    void NormalizeImageFilterGenericFilter<args_info_type>::SetArgsInfo(const args_info_type & a)
     {
         mArgsInfo=a;
         this->SetIOVerbose(mArgsInfo.verbose_flag);
@@ -73,15 +71,8 @@ namespace clitk
         if (mArgsInfo.output_given) {
             this->SetOutputFilename(mArgsInfo.output_arg);
         }
-        //
-        if (mArgsInfo.normalize_flag) {
-            this->m_NormalizeOutput = 1;
-        }
-        else {
-            this->m_NormalizeOutput = 0;
-        }
         if (mArgsInfo.mask_given) {
-          this->AddInputFilename(mArgsInfo.mask_arg);
+            this->AddInputFilename(mArgsInfo.mask_arg);
         }
     }
     //--------------------------------------------------------------------
@@ -92,8 +83,9 @@ namespace clitk
     template<class args_info_type>
     template<class InputImageType>
     void
-    ImageGradientMagnitudeGenericFilter<args_info_type>::UpdateWithInputImageType()
+    NormalizeImageFilterGenericFilter<args_info_type>::UpdateWithInputImageType()
     {
+
         // Main filter
         typedef typename InputImageType::PixelType InputPixelType;
         typedef itk::Image<float, InputImageType::ImageDimension> OutputImageType;
@@ -115,7 +107,6 @@ namespace clitk
             mask->FillBuffer(1);
         }
 
-
         // Create output image
         typename OutputImageType::Pointer outputImage = OutputImageType::New();
         outputImage->SetRegions(input->GetLargestPossibleRegion());
@@ -128,63 +119,42 @@ namespace clitk
         IteratorOutputType ito = IteratorOutputType(outputImage, outputImage->GetLargestPossibleRegion());
 
         // Filter
-        typename OutputImageType::Pointer outputGradientFilter;
-        if (mArgsInfo.gaussian_filter_flag == 0) {
-        typedef itk::GradientMagnitudeImageFilter<InputImageType, OutputImageType> GradientMagnitudeImageFilterType;
-        typename GradientMagnitudeImageFilterType::Pointer gradientFilter=GradientMagnitudeImageFilterType::New();
-        gradientFilter->SetInput(input);
-        gradientFilter->Update();
-        outputGradientFilter = gradientFilter->GetOutput();
-        }
-        else {
-            typedef itk::GradientMagnitudeRecursiveGaussianImageFilter<InputImageType, OutputImageType> GradientMagnitudeImageFilterType;
-            typename GradientMagnitudeImageFilterType::Pointer gradientFilter=GradientMagnitudeImageFilterType::New();
-            gradientFilter->SetInput(input);
-            gradientFilter->Update();
-            outputGradientFilter = gradientFilter->GetOutput();
-        }
         // Set iterator
-        typedef itk::ImageRegionIterator<OutputImageType> IteratorType;
-        IteratorType it(outputGradientFilter, outputGradientFilter->GetLargestPossibleRegion());
+        typedef itk::ImageRegionIterator<InputImageType> IteratorType;
+        IteratorType it(input, input->GetLargestPossibleRegion());
 
         // Set mask iterator
         typedef itk::ImageRegionIterator<MaskImageType> IteratorMaskType;
         IteratorMaskType itm(mask, mask->GetLargestPossibleRegion());
 
-        //typedef itk::MinimumMaximumImageCalculator <OutputImageType> ImageCalculatorFilterType;
-        //typename ImageCalculatorFilterType::Pointer imageCalculatorFilter = ImageCalculatorFilterType::New();
-        //imageCalculatorFilter->SetImage(outputGradientFilter);
-        //imageCalculatorFilter->Compute();
-        typedef itk::LabelStatisticsImageFilter< OutputImageType, MaskImageType > LabelStatisticsImageFilterType;
+        typedef itk::LabelStatisticsImageFilter< InputImageType, MaskImageType > LabelStatisticsImageFilterType;
         typename LabelStatisticsImageFilterType::Pointer labelStatisticsImageFilter = LabelStatisticsImageFilterType::New();
         labelStatisticsImageFilter->SetLabelInput( mask );
-        labelStatisticsImageFilter->SetInput(outputGradientFilter);
+        labelStatisticsImageFilter->SetInput(input);
         labelStatisticsImageFilter->Update();
 
         //std::cout << "Number of labels: " << labelStatisticsImageFilter->GetNumberOfLabels() << std::endl;
 
         float minImg = labelStatisticsImageFilter->GetMinimum(1);
-        //std::cout << "minImg: " << minImg << std::endl;
+        //std::cout << "minImg= " << minImg << std::endl;
         float maxImg = labelStatisticsImageFilter->GetMaximum(1);
-        //std::cout << "maxImg: " << maxImg << std::endl;
+        //std::cout << "maxImg= " << maxImg << std::endl;
 
         it.GoToBegin();
         ito.GoToBegin();
         itm.GoToBegin();
 
         while (!ito.IsAtEnd()) {
-            if(m_NormalizeOutput && itm.Get() == 1) {
+            if(itm.Get() == 1) {
                 ito.Set(((float) it.Get() - minImg)/(maxImg-minImg));
-            }
-            if (m_NormalizeOutput == 0 && itm.Get() == 1) {
-                ito.Set((float) it.Get());
             }
             ++it;
             ++ito;
             ++itm;
         }
-
-        //typename OutputImageType::Pointer outputImage = outputGradientFilter;
+        //
+        //
+        // Write/Save results
         this->template SetNextOutput<OutputImageType>(outputImage);
     }
     //--------------------------------------------------------------------
@@ -192,4 +162,4 @@ namespace clitk
 
 }//end clitk
 
-#endif //#define clitkImageGradientMagnitudeGenericFilter_txx
+#endif //#define clitkNormalizeImageFilterGenericFilter_txx

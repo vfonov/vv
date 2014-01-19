@@ -37,7 +37,7 @@
 //--------------------------------------------------------------------
 template <class InputImageType, class OutputImageType>
 clitk::ResampleImageWithOptionsFilter<InputImageType, OutputImageType>::
-ResampleImageWithOptionsFilter():itk::ImageToImageFilter<InputImageType, OutputImageType>() 
+ResampleImageWithOptionsFilter():itk::ImageToImageFilter<InputImageType, OutputImageType>()
 {
   static const unsigned int dim = InputImageType::ImageDimension;
   this->SetNumberOfRequiredInputs(1);
@@ -66,7 +66,7 @@ ResampleImageWithOptionsFilter():itk::ImageToImageFilter<InputImageType, OutputI
 template <class InputImageType, class OutputImageType>
 void
 clitk::ResampleImageWithOptionsFilter<InputImageType, OutputImageType>::
-SetInput(const InputImageType * image) 
+SetInput(const InputImageType * image)
 {
   // Process object is not const-correct so the const casting is required.
   this->SetNthInput(0, const_cast<InputImageType *>(image));
@@ -78,7 +78,7 @@ SetInput(const InputImageType * image)
 template <class InputImageType, class OutputImageType>
 void
 clitk::ResampleImageWithOptionsFilter<InputImageType, OutputImageType>::
-GenerateInputRequestedRegion() 
+GenerateInputRequestedRegion()
 {
   // call the superclass's implementation of this method
   Superclass::GenerateInputRequestedRegion();
@@ -99,7 +99,7 @@ GenerateInputRequestedRegion()
 template <class InputImageType, class OutputImageType>
 void
 clitk::ResampleImageWithOptionsFilter<InputImageType, OutputImageType>::
-GenerateOutputInformation() 
+GenerateOutputInformation()
 {
   static const unsigned int dim = InputImageType::ImageDimension;
 
@@ -124,27 +124,31 @@ GenerateOutputInformation()
   if (m_OutputIsoSpacing != -1) { // apply isoSpacing
     for(unsigned int i=0; i<dim; i++) {
       m_OutputSpacing[i] = m_OutputIsoSpacing;
-      // floor() is used to intentionally reduce the number of slices 
-      // because, from a clinical point of view, it's better to 
+      // floor() is used to intentionally reduce the number of slices
+      // because, from a clinical point of view, it's better to
       // remove data than to add data that privously didn't exist.
       if(inputSpacing[i]*m_OutputSpacing[i]<0)
         itkExceptionMacro( << "Input and output spacings don't have the same signs, can't cope with that" );
       m_OutputSize[i] = (int)floor(inputSize[i]*inputSpacing[i]/m_OutputSpacing[i]);
     }
-  } else {
+  }
+  else if(m_OutputSpacing[0]==-1 ||  m_OutputSize[0]==0){
     if (m_OutputSpacing[0] != -1) { // apply spacing, compute size
       for(unsigned int i=0; i<dim; i++) {
-        if(inputSpacing[i]*m_OutputSpacing[i]<0)
+        if(inputSpacing[i]*m_OutputSpacing[i]<0) {
           itkExceptionMacro( << "Input and output spacings don't have the same signs, can't cope with that" );
-	// see comment above for the use of floor()
-	m_OutputSize[i] = (int)floor(inputSize[i]*inputSpacing[i]/m_OutputSpacing[i]);
+        }
+        // see comment above for the use of floor()
+        m_OutputSize[i] = (int)floor(inputSize[i]*inputSpacing[i]/m_OutputSpacing[i]);
       }
-    } else {
+    }
+    else {
       if (m_OutputSize[0] != 0) { // apply size, compute spacing
         for(unsigned int i=0; i<dim; i++) {
           m_OutputSpacing[i] = (double)inputSize[i]*inputSpacing[i]/(double)m_OutputSize[i];
         }
-      } else { // copy input size/spacing ... (no resampling)
+      }
+      else { // copy input size/spacing ... (no resampling)
         m_OutputSize = inputSize;
         m_OutputSpacing = inputSpacing;
       }
@@ -190,11 +194,11 @@ GenerateOutputInformation()
 
 //--------------------------------------------------------------------
 template <class InputImageType, class OutputImageType>
-void 
+void
 clitk::ResampleImageWithOptionsFilter<InputImageType, OutputImageType>::
-GenerateData() 
+GenerateData()
 {
-   
+
   // Get input pointer
   InputImagePointer input = dynamic_cast<InputImageType*>(itk::ProcessObject::GetInput(0));
   static const unsigned int dim = InputImageType::ImageDimension;
@@ -238,7 +242,7 @@ GenerateData()
   filter->SetOutputSpacing(m_OutputSpacing);
   filter->SetOutputOrigin(m_OutputOrigin);
   filter->SetDefaultPixelValue(m_DefaultPixelValue);
-  filter->SetNumberOfThreads(this->GetNumberOfThreads()); 
+  filter->SetNumberOfThreads(this->GetNumberOfThreads());
   filter->SetOutputDirection(m_OutputDirection); // <-- NEEDED if we want to keep orientation (in case of PermutAxes for example)
 
   // Select interpolator
@@ -306,21 +310,16 @@ GenerateData()
   filter->Update();
 
   // Set output
-  // DD("before Graft");
-
-  //this->GraftOutput(filter->GetOutput());
-  this->SetNthOutput(0, filter->GetOutput());
-
-  // DD("after Graft");
+  this->GraftOutput(filter->GetOutput());
 }
 //--------------------------------------------------------------------
 
 
 //--------------------------------------------------------------------
 template<class InputImageType>
-typename InputImageType::Pointer 
-clitk::ResampleImageSpacing(typename InputImageType::Pointer input, 
-                            typename InputImageType::SpacingType spacing, 
+typename InputImageType::Pointer
+clitk::ResampleImageSpacing(typename InputImageType::Pointer input,
+                            typename InputImageType::SpacingType spacing,
                             int interpolationType)
 {
   typedef clitk::ResampleImageWithOptionsFilter<InputImageType> ResampleFilterType;

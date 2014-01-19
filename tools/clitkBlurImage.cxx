@@ -16,28 +16,35 @@
   - CeCILL-B   http://www.cecill.info/licences/Licence_CeCILL-B_V1-en.html
 ===========================================================================**/
 
+/* =================================================
+ * @file   clitkBlurImageGenericFilter.txx
+ * @author xxx <xxx@creatis.insa-lyon.fr>
+ * @date   29 June 2029
+ *
+ * @brief BlurImage an image
+ *
+ ===================================================*/
+
 // clitk
-#include "clitkResampleImage_ggo.h"
-#include "clitkIO.h"
-#include "clitkResampleImageGenericFilter.h"
+#include "clitkBlurImage_ggo.h"
+#include "clitkBlurImageGenericFilter.h"
 
 //--------------------------------------------------------------------
 int main(int argc, char * argv[])
 {
 
   // Init command line
-  GGO(clitkResampleImage, args_info);
+  GGO(clitkBlurImage, args_info);
   CLITK_INIT;
 
   // Filter
-  typedef clitk::ResampleImageGenericFilter FilterType;
+  typedef clitk::BlurImageGenericFilter<args_info_clitkBlurImage> FilterType;
   FilterType::Pointer filter = FilterType::New();
 
   filter->SetArgsInfo(args_info);
-  CLITK_TRY_CATCH_EXIT(filter->Update());
+  filter->Update();
 
-  // this is the end my friend
   return EXIT_SUCCESS;
-
 }// end main
+
 //--------------------------------------------------------------------
