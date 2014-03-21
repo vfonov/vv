@@ -36,6 +36,11 @@ IF (CLITK_BUILD_TOOLS)
   #   )
   SET(TOOLS_INSTALL clitkDicomInfo)
 
+  WRAP_GGO(clitkPointRigidRegistration_GGO_C clitkPointRigidRegistration.ggo)
+  ADD_EXECUTABLE(clitkPointRigidRegistration clitkPointRigidRegistration.cxx ${clitkPointRigidRegistration_GGO_C})
+  TARGET_LINK_LIBRARIES(clitkPointRigidRegistration clitkCommon)
+  SET(TOOLS_INSTALL ${TOOLS_INSTALL} clitkPointRigidRegistration)
+
   WRAP_GGO(clitkDicom2Image_GGO_C clitkDicom2Image.ggo)
   ADD_EXECUTABLE(clitkDicom2Image clitkDicom2Image.cxx ${clitkDicom2Image_GGO_C})
   TARGET_LINK_LIBRARIES(clitkDicom2Image clitkCommon)
