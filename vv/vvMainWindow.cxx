@@ -2250,7 +2250,6 @@ void vvMainWindow::OpenField()
       return;
     }
 
-<<<<<<< HEAD
     QString Extensions = "Images ( *.mhd)";
     Extensions += ";;Images ( *.mha)";
     Extensions += ";;VF Images ( *.vf)";
@@ -2258,21 +2257,13 @@ void vvMainWindow::OpenField()
     Extensions += ";;nrrd Images ( *.nrrd)";
     Extensions += ";;nhdr Images ( *.nhdr)";
     Extensions += ";;minc Images ( *.mnc)";
-||||||| merged common ancestors
-    QString Extensions = "Images ( *.mhd)";
-    Extensions += ";;Images ( *.mha)";
-    Extensions += ";;VF Images ( *.vf)";
-    Extensions += ";;nii Images ( *.nii)";
-    Extensions += ";;nrrd Images ( *.nrrd)";
-    Extensions += ";;nhdr Images ( *.nhdr)";
-=======
+    Extensions += ";;minc Images ( *.mnc.gz)";
     QString Extensions = "Images ( *.mhd *.mha *.vf *.nii *.nrrd *.nhdr)";
     // Extensions += ";;Images ( *.mha)";
     // Extensions += ";;VF Images ( *.vf)";
     // Extensions += ";;nii Images ( *.nii)";
     // Extensions += ";;nrrd Images ( *.nrrd)";
     // Extensions += ";;nhdr Images ( *.nhdr)";
->>>>>>> origin/master
     Extensions += ";;All Files (*)";
     QString file = QFileDialog::getOpenFileName(this,tr("Load deformation field"),mInputPathName,Extensions);
     if (!file.isEmpty())
