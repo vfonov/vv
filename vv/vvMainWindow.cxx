@@ -2258,7 +2258,6 @@ void vvMainWindow::OpenField()
     Extensions += ";;nhdr Images ( *.nhdr)";
     Extensions += ";;minc Images ( *.mnc)";
     Extensions += ";;minc Images ( *.mnc.gz)";
-    QString Extensions = "Images ( *.mhd *.mha *.vf *.nii *.nrrd *.nhdr)";
     // Extensions += ";;Images ( *.mha)";
     // Extensions += ";;VF Images ( *.vf)";
     // Extensions += ";;nii Images ( *.nii)";
